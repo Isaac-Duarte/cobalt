@@ -1,7 +1,7 @@
 use std::fs;
 use miette::Result;
 
-use crate::{cli::BuildCommand, compiler::parser};
+use crate::{cli::BuildCommand, compiler::{codegen, parser}};
 
 /// Builds the provided COBOL file.
 pub(crate) fn run_build(args: &BuildCommand) -> Result<()> {
@@ -9,11 +9,11 @@ pub(crate) fn run_build(args: &BuildCommand) -> Result<()> {
     let txt = fs::read_to_string(args.input()).expect("Failed to load source file from disk.");
 
     // Perform a parse pass.
-    parser::parse(&txt)?;
+    let ast = parser::parse(&txt)?;
 
-    // Generate Cranelift IR from AST.
-
-    // Compile Cranelift IR down to object file.
+    // Generate object.
+    let code_gen = codegen::CodeGenerator::new().unwrap();
+    code_gen.generate(ast);
 
     Ok(())
 }

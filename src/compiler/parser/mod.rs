@@ -8,6 +8,9 @@ mod ast;
 mod divs;
 mod stat;
 
+/// Exports.
+pub use ast::Ast;
+
 /// Simple span types for use in AST items throughout the parser.
 pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
@@ -18,7 +21,7 @@ pub type Spanned<T> = (T, Span);
 type ParserInput<'tokens, 'src> =
     chumsky::input::SpannedInput<Token<'src>, Span, &'tokens [(Token<'src>, Span)]>;
 
-pub fn parse(input: &str) -> Result<()> {
+pub fn parse(input: &str) -> Result<Ast> {
     // Extract tokens from input.
     let lexer = token::lexer();
     let (toks, errs) = lexer.parse(input).into_output_errors();
@@ -40,7 +43,7 @@ pub fn parse(input: &str) -> Result<()> {
             println!("{}", e.reason().to_string());
         });
 
-    println!("ast: {:#?}", ast.unwrap());
+    println!("ast: {:#?}", ast.as_ref().unwrap());
         
-    Ok(())
+    Ok(ast.unwrap())
 }

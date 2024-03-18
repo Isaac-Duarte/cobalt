@@ -4,7 +4,7 @@ use super::{divs::{ident_div, proc_div, IdentDiv, ProcDiv}, token::Token, Parser
 
 /// Represents the overall AST of a COBOL program.
 #[derive(Debug)]
-pub(super) struct Ast<'src> {
+pub struct Ast<'src> {
     // The identification division of the program.
     ident_div: IdentDiv<'src>,
 
