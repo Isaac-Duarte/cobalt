@@ -10,6 +10,7 @@ mod stat;
 
 /// Exports.
 pub use ast::Ast;
+pub(crate) use stat::Stat;
 
 /// Simple span types for use in AST items throughout the parser.
 pub type Span = SimpleSpan<usize>;

@@ -6,10 +6,10 @@ use super::{divs::{ident_div, proc_div, IdentDiv, ProcDiv}, token::Token, Parser
 #[derive(Debug)]
 pub struct Ast<'src> {
     // The identification division of the program.
-    ident_div: IdentDiv<'src>,
+    pub ident_div: IdentDiv<'src>,
 
     // The procedure division of the program.
-    proc_div: ProcDiv<'src>
+    pub proc_div: ProcDiv<'src>
 }
 
 /// Parser for an entire COBOL program's AST.

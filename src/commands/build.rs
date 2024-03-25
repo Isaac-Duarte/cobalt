@@ -11,9 +11,12 @@ pub(crate) fn run_build(args: &BuildCommand) -> Result<()> {
     // Perform a parse pass.
     let ast = parser::parse(&txt)?;
 
-    // Generate object.
-    let code_gen = codegen::CodeGenerator::new().unwrap();
-    code_gen.generate(ast);
+    // Translate the AST into Cranelift IR.
+    let mut code_gen = codegen::CodeGenerator::new(&ast).expect("Failed to create code generator.");
+    code_gen.translate(ast)?;
+
+    // Write generated object code to file.
+    code_gen.generate();
 
     Ok(())
 }

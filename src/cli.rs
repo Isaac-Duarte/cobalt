@@ -39,8 +39,4 @@ impl BuildCommand {
     pub fn input(&self) -> &PathBuf {
         &self.input
     }
-
-    pub fn verbose(&self) -> u8 {
-        self.verbose
-    }
 }

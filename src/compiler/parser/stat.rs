@@ -4,7 +4,7 @@ use super::{token::Token, ParserInput, Span, Spanned};
 
 /// Represents a single executable statement within a COBOL program.
 #[derive(Debug)]
-pub(super) enum Stat<'src> {
+pub(crate) enum Stat<'src> {
     Display(&'src str)
 }
 

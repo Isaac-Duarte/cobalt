@@ -4,16 +4,16 @@ use super::{stat::{stat, Stat}, token::Token, ParserInput, Span, Spanned};
 
 /// The identification division of a single COBOL program.
 #[derive(Debug)]
-pub(super) struct IdentDiv<'src> {
+pub(crate) struct IdentDiv<'src> {
     /// The ID slug of the program.
-    program_id: &'src str
+    pub program_id: &'src str
 }
 
 /// The procedure division of a single COBOL program.
 #[derive(Debug)]
-pub(super) struct ProcDiv<'src> {
+pub(crate) struct ProcDiv<'src> {
     /// Statements within the procedure division.
-    stats: Vec<Spanned<Stat<'src>>>
+    pub stats: Vec<Spanned<Stat<'src>>>
 }
 
 /// Parser for the identity division within a COBOL program.
