@@ -1,89 +1,120 @@
-use super::Span;
-use chumsky::prelude::*;
+use super::Spanned;
+use logos::Logos;
+use std::fmt::Display;
 
-/// Represents a single token within the Cobalt parser.
-#[derive(Clone, Debug, PartialEq)]
-pub(super) enum Token<'src> {
-    // Generic structures.
-    Ident(&'src str),
-    Str(&'src str),
-    Ctrl(char),
+// A macro for shortening references to all the token types.
+#[rustfmt::skip]
+macro_rules! tok {
+    [ident_div] => { $crate::compiler::parser::Token::IdentDiv };
+    [proc_div] => { $crate::compiler::parser::Token::ProcDiv };
+    [program_id] => { $crate::compiler::parser::Token::ProgramId };
+    [stop_run] => { $crate::compiler::parser::Token::StopRun };
+    [display] => { $crate::compiler::parser::Token::Display };
+    [.] => { $crate::compiler::parser::Token::CtrlDot };
+    [str_literal] => { $crate::compiler::parser::Token::StringLiteral };
+    [ident] => { $crate::compiler::parser::Token::Identifier };
+    [eol] => { $crate::compiler::parser::Token::EOL };
+    [eof] => { $crate::compiler::parser::Token::EOF };
+}
+pub(crate) use tok;
 
-    // Reserved keywords.
-    IdentificationDiv, // IDENTIFICATION DIVISION
-    ProcedureDiv,      // PROCEDURE DIVISION
-    ProgramId,         // PROGRAM-ID
-    Display,           // DISPLAY
-    StopRun,           // STOP RUN
+/// A lexer for COBOL tokens.
+pub(crate) struct Lexer<'src> {
+    input: &'src str,
+    generated: logos::SpannedIter<'src, Token>,
+    eof_reached: bool
 }
 
-impl<'src> Token<'src> {
-    pub fn unwrap_str(&self) -> &'src str {
-        if let Token::Str(txt) = self {
-            txt
-        } else {
-            panic!("attempted to unwrap {:#?} as Token::Str.", self);
-        }
-    }
-
-    pub fn unwrap_ident(&self) -> &'src str {
-        if let Token::Ident(txt) = self {
-            txt
-        } else {
-            panic!("attempted to unwrap {:#?} as Token::Ident.", self);
+impl<'src> Lexer<'src> {
+    pub fn new(input: &'src str) -> Self {
+        Self {
+            input,
+            generated: Token::lexer(input).spanned(),
+            eof_reached: false
         }
     }
 }
 
-/// Returns a lexer which accepts a string of COBOL tokens.
-pub(super) fn lexer<'src>(
-) -> impl Parser<'src, &'src str, Vec<(Token<'src>, Span)>, extra::Err<Rich<'src, char, Span>>> {
-    // Reserved words.
-    let ident_div = just("IDENTIFICATION DIVISION").to(Token::IdentificationDiv);
-    let procedure_div = just("PROCEDURE DIVISION").to(Token::ProcedureDiv);
-    let stop_run = just("STOP RUN").to(Token::StopRun);
+/// Allows for iterating over the lexer's tokens.
+impl<'src> Iterator for Lexer<'src> {
+    type Item = Spanned<Token>;
 
-    // Identifiers.
-    // This is technically incorrect, but fine for now, since we need LL(k) lookahead for correctness...
-    let ident = any().filter(char::is_ascii_alphanumeric)
-        .then(any().filter(|c| char::is_ascii_alphanumeric(c) || *c == '-').repeated())
-        .to_slice()
-        .map(|ident: &str| match ident {
-            "PROGRAM-ID" => Token::ProgramId,
-            "DISPLAY" => Token::Display,
-            _ => Token::Ident(ident)
-        });
+    /// Returns the next token as a spanned object.
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.generated.next() {
+                Some((kind, span)) => {
+                    let kind = kind.unwrap_or(Token::Invalid);
 
-    // String literals.
-    let single_quote_str = just("'")
-        .ignore_then(none_of("'").repeated())
-        .then_ignore(just("'"))
-        .to_slice();
-    let dbl_quote_str = just('"')
-        .ignore_then(none_of('"').repeated())
-        .then_ignore(just('"'))
-        .to_slice();
-    let string = single_quote_str
-        .or(dbl_quote_str)
-        .map(Token::Str);
+                    //If we've found either type of comment, we skip to the next token.
+                    if kind == Token::SingleLineComment {
+                        continue;
+                    }
 
-    // Control characters, endln.
-    let ctrl = one_of(".").map(Token::Ctrl);
+                    //Not a comment, we can safely return the token.
+                    return Some((kind, span.into()));
+                }
 
-    // Create combined parser for all tokens.
-    let token = choice((
-        ident_div,
-        procedure_div,
-        stop_run,
-        ident,
-        string,
-        ctrl
-    )).padded();
+                // No more tokens, EOF already reached, exit.
+                None if self.eof_reached => return None,
 
-    // Collect all tokens.
-    token
-        .map_with(|tok, e| (tok, e.span()))
-        .repeated()
-        .collect()
-        .then_ignore(end())
+                // End of tokens reached, return EOF token.
+                None => {
+                    self.eof_reached = true;
+                    let eof_span = self.input.len()..self.input.len();
+                    return Some((tok![eof], eof_span.into()));
+                }
+            }
+        }
+    }
+}
+
+/// Represents a single COBOL token.
+#[derive(Logos, Debug, Copy, Clone, PartialEq)]
+pub(crate) enum Token {
+    #[token("IDENTIFICATION DIVISION")]
+    IdentDiv,
+    #[token("PROCEDURE DIVISION")]
+    ProcDiv,
+    #[token("PROGRAM-ID")]
+    ProgramId,
+    #[token("STOP RUN")]
+    StopRun,
+    #[token("DISPLAY")]
+    Display,
+    #[token(".")]
+    CtrlDot,
+    #[regex(r#""((\\[.])|[^\\"])*""#)]
+    #[regex(r#"'((\\[.])|[^\\'])*'"#)]
+    StringLiteral,
+    #[regex(r#"([A-Z0-9]+(-)?)*[A-Z0-9]+"#)]
+    Identifier,
+    #[regex(r"//[^\n]*")]
+    SingleLineComment,
+    #[regex(r"((\r)?\n)+")]
+    EOL,
+    #[regex(r"[ \t\f]+", logos::skip)]
+    Ignored,
+    Invalid,
+    EOF,
+}
+
+/// Display formatting for all token types.
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Token::IdentDiv => write!(f, "IDENTIFICATION DIVISION"),
+            Token::ProcDiv => write!(f, "PROCEDURE DIVISION"),
+            Token::ProgramId => write!(f, "PROGRAM-ID"),
+            Token::StopRun => write!(f, "STOP RUN"),
+            Token::Display => write!(f, "DISPLAY"),
+            Token::CtrlDot => write!(f, "."),
+            Token::StringLiteral => write!(f, "string-literal"),
+            Token::Identifier => write!(f, "identifier"),
+            Token::EOL => write!(f, "EOL"),
+            Token::EOF => write!(f, "EOF"),
+            Token::Invalid => write!(f, "invalid token (unknown)"),
+            Token::SingleLineComment | Token::Ignored => unreachable!()
+        }
+    }
 }

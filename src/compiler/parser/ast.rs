@@ -1,6 +1,5 @@
-use chumsky::prelude::*;
-
-use super::{divs::{ident_div, proc_div, IdentDiv, ProcDiv}, token::Token, ParserInput, Span};
+use miette::Result;
+use super::{divs::{IdentDiv, ProcDiv}, Parser};
 
 /// Represents the overall AST of a COBOL program.
 #[derive(Debug)]
@@ -12,19 +11,16 @@ pub struct Ast<'src> {
     pub proc_div: ProcDiv<'src>
 }
 
-/// Parser for an entire COBOL program's AST.
-pub(super) fn ast<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    Ast<'src>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> + Clone {
-    let ast = ident_div()
-        .then(proc_div())
-        .map(|(ident, proc)| Ast {
-            ident_div: ident,
-            proc_div: proc
-        });
-
-    ast
+impl<'src> Parser<'src> {
+    /// Parses a complete AST from the current parser position.
+    pub(crate) fn ast(&mut self) -> Result<Ast<'src>> {
+        // Extract the identification, procedure division.
+        let ident_div = self.ident_div()?;
+        let proc_div = self.proc_div()?;
+        
+        Ok(Ast {
+            ident_div,
+            proc_div
+        })
+    }
 }

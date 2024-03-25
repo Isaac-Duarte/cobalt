@@ -1,6 +1,5 @@
-use chumsky::prelude::*;
-
-use super::{stat::{stat, Stat}, token::Token, ParserInput, Span, Spanned};
+use miette::Result;
+use super::{stat::Stat, token::tok, Parser, Spanned};
 
 /// The identification division of a single COBOL program.
 #[derive(Debug)]
@@ -16,37 +15,47 @@ pub(crate) struct ProcDiv<'src> {
     pub stats: Vec<Spanned<Stat<'src>>>
 }
 
-/// Parser for the identity division within a COBOL program.
-pub(super) fn ident_div<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    IdentDiv<'src>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> + Clone {
-    let program_id = just(Token::ProgramId)
-        .then_ignore(just(Token::Ctrl('.')))
-        .then(any().filter(|t| matches!(t, Token::Ident(_))))
-        .then_ignore(just(Token::Ctrl('.')))
-        .map(|(_, txt)| IdentDiv { program_id: txt.unwrap_ident() });
+impl<'src> Parser<'src> {
+    /// Parses an identification division from COBOL tokens.
+    pub(super) fn ident_div(&mut self) -> Result<IdentDiv<'src>> {
+        // Parse header.
+        self.consume_vec(&[tok![ident_div], tok![.], tok![eol]])?;
 
-    let ident_div = just([Token::IdentificationDiv, Token::Ctrl('.')])
-        .then(program_id)
-        .map(|(_, pid)| pid);
+        // Parse program ID statement.
+        self.consume_vec(&[tok![program_id], tok![.]])?;
+        let prog_id_tok = self.consume(tok![ident])?;
+        let program_id = self.text(prog_id_tok);
+        self.consume_vec(&[tok![.], tok![eol]])?;
 
-    ident_div
-}
+        Ok(IdentDiv {
+            program_id
+        })
+    }
 
-/// Parser for a procedure division within a COBOL program.
-pub(super) fn proc_div<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    ParserInput<'tokens, 'src>,
-    ProcDiv<'src>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> + Clone {
-    let proc_div = just([Token::ProcedureDiv, Token::Ctrl('.')])
-        .then(stat().repeated().collect::<Vec<_>>())
-        .then_ignore(just([Token::StopRun, Token::Ctrl('.')]))
-        .map(|(_, c)| ProcDiv { stats: c });
+    /// Parses a procedure division from COBOL tokens.
+    pub(super) fn proc_div(&mut self) -> Result<ProcDiv<'src>> {
+        // Parse header.
+        self.consume_vec(&[tok![proc_div], tok![.], tok![eol]])?;
 
-    proc_div
+        // Parse statements until we peek a "STOP RUN".
+        let mut stats: Vec<Spanned<Stat<'src>>> = Vec::new();
+        while self.peek() != tok![stop_run] {
+            let start_idx = self.peek_idx();
+            let stat = self.stat()?;
+            stats.push((stat, (start_idx, self.cur_idx()).into()));
+        }
+
+        // Consume the stop, EOF.
+        // We optionally consume an EOL here too, since some operating systems (like Windows)
+        // prefer to save files with a CRLF before the EOF marker.
+        self.consume_vec(&[tok![stop_run], tok![.]])?;
+        if self.peek() == tok![eol] {
+            self.next()?;
+        }
+        self.consume(tok![eof])?;
+
+        Ok(ProcDiv {
+            stats
+        })
+    }
 }
