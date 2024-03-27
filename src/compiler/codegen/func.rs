@@ -2,23 +2,37 @@ use std::collections::HashMap;
 
 use crate::compiler::parser::{LiteralId, Spanned, Stat};
 use cranelift::{
-    codegen::ir::{types, AbiParam, InstBuilder},
+    codegen::ir::InstBuilder,
     frontend::FunctionBuilder,
 };
 use cranelift_module::{DataId, Module};
 use cranelift_object::ObjectModule;
 use miette::Result;
 
+use super::intrinsics::{CobaltIntrinsic, IntrinsicManager};
+
 /// Structure for translating function-level AST nodes to Cranelift IR.
 pub(super) struct FuncTranslator<'src> {
+    /// The function builder to use when translating the function.
     pub builder: FunctionBuilder<'src>,
+
+    /// The module this function is a part of.
     pub module: &'src mut ObjectModule,
+
+    /// The intrinsics manager for this function.
+    pub intrinsics: &'src mut IntrinsicManager,
+
+    /// Map of literal data available to the function.
     pub lit_map: &'src mut HashMap<LiteralId, DataId>,
 }
 
 impl<'src> FuncTranslator<'src> {
     /// Generates Cranelift IR for a single statement from the given set of statements.
     pub fn translate(&mut self, stats: &Vec<Spanned<Stat<'src>>>) -> Result<()> {
+        // Reset the intrinsics manager, since we're beginning a new function.
+        self.intrinsics.clear_refs();
+
+        // Translate all statements within the function.
         for stat in stats {
             self.translate_stat(stat)?;
         }
@@ -41,19 +55,12 @@ impl<'src> FuncTranslator<'src> {
             .module
             .declare_data_in_func(*self.lit_map.get(&lit_id).unwrap(), self.builder.func);
 
-        // Call "putchar" on test data.
+        // Call "puts" on the string.
+        let puts = self.intrinsics.get_ref(self.module, self.builder.func, CobaltIntrinsic::LibcPuts)?;
         let ptr_type = self.module.target_config().pointer_type();
-        let mut putchar_sig = self.module.make_signature();
-        putchar_sig.params.push(AbiParam::new(ptr_type));
-        putchar_sig.returns.push(AbiParam::new(types::I32));
-        let puts_id = self
-            .module
-            .declare_function("puts", cranelift_module::Linkage::Import, &putchar_sig)
-            .unwrap();
-        let puts_ref = self.module.declare_func_in_func(puts_id, self.builder.func);
-
         let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
-        self.builder.ins().call(puts_ref, &[string_ptr]);
+        self.builder.ins().call(*puts, &[string_ptr]);
+
         Ok(())
     }
 }

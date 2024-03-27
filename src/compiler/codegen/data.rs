@@ -26,8 +26,14 @@ pub(super) fn upload_literals(
             .declare_anonymous_data(false, false)
             .expect("Failed to declare literal data.");
         desc.clear();
-        let literal_bytes = literal.clone().into_bytes().into_boxed_slice();
-        desc.define(literal_bytes);
+
+        // Get the bytes for this literal string.
+        // Since this isn't zero-terminated by default, we do that here.
+        let mut literal_bytes = literal.clone().into_bytes();
+        literal_bytes.push(0x0);
+
+        // Define the data description, data within the module.
+        desc.define(literal_bytes.into_boxed_slice());
         module
             .define_data(data_id, &desc)
             .expect("Failed to define literal data bytes.");

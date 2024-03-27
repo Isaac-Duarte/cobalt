@@ -18,12 +18,13 @@ use miette::Result;
 
 use crate::config::BuildConfig;
 
-use self::func::FuncTranslator;
+use self::{func::FuncTranslator, intrinsics::IntrinsicManager};
 
 use super::parser::{Ast, LiteralId, Spanned, Stat};
 
 mod data;
 mod func;
+mod intrinsics;
 
 /// Base code generator state.
 pub struct CodeGenerator<'cfg> {
@@ -41,6 +42,9 @@ pub struct CodeGenerator<'cfg> {
 
     /// The main module.
     module: ObjectModule,
+
+    /// Intrinsics manager for this module.
+    intrinsics: IntrinsicManager,
 
     /// Map of AST static data definitions to object data.
     lit_map: HashMap<LiteralId, DataId>,
@@ -71,6 +75,7 @@ impl<'cfg> CodeGenerator<'cfg> {
             ctx: obj_module.make_context(),
             data_description: DataDescription::new(),
             module: obj_module,
+            intrinsics: IntrinsicManager::new(),
             lit_map: HashMap::new(),
         })
     }
@@ -119,6 +124,7 @@ impl<'cfg> CodeGenerator<'cfg> {
             let mut trans = FuncTranslator {
                 builder,
                 module: &mut self.module,
+                intrinsics: &mut self.intrinsics,
                 lit_map: &mut self.lit_map,
             };
             trans.translate(stats)?;

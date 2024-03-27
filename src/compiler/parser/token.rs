@@ -84,8 +84,8 @@ pub(crate) enum Token {
     Display,
     #[token(".")]
     CtrlDot,
-    #[regex(r#""((\\[.])|[^\\"])*""#)]
-    #[regex(r#"'((\\[.])|[^\\'])*'"#)]
+    #[regex(r#""((\[.])|[^\"])*""#)]
+    #[regex(r#"'((\[.])|[^\'])*'"#)]
     StringLiteral,
     #[regex(r#"([A-Z0-9]+(-)?)*[A-Z0-9]+"#)]
     Identifier,
@@ -113,7 +113,7 @@ impl Display for Token {
             Token::Identifier => write!(f, "identifier"),
             Token::EOL => write!(f, "EOL"),
             Token::EOF => write!(f, "EOF"),
-            Token::Invalid => write!(f, "invalid token (unknown)"),
+            Token::Invalid => write!(f, "(unknown)"),
             Token::SingleLineComment | Token::Ignored => unreachable!()
         }
     }
