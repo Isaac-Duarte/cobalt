@@ -11,8 +11,8 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn command(&self) -> &Command {
-        &self.command
+    pub fn command(self) -> Command {
+        self.command
     }
 }
 
@@ -29,6 +29,16 @@ pub struct BuildCommand {
     #[arg(value_name = "FILE")]
     input: PathBuf,
 
+    /// The name of the output executable.
+    /// By default, the primary input file name with extensions removed.
+    #[arg(short, long)]
+    output_name: Option<String>,
+
+    /// The output directory to save to.
+    /// By default, `./out`.
+    #[arg(short = 'd', long, value_name = "DIR")]
+    output_dir: Option<PathBuf>,
+
     /// Set the verbosity of compiler output. Can be specified
     /// multiple times.
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -38,5 +48,13 @@ pub struct BuildCommand {
 impl BuildCommand {
     pub fn input(&self) -> &PathBuf {
         &self.input
+    }
+
+    pub fn output_name(&self) -> Option<String> {
+        self.output_name.as_ref().map(|x| x.clone())
+    }
+
+    pub fn output_dir(&self) -> Option<PathBuf> {
+        self.output_dir.as_ref().map(|x| x.clone())
     }
 }

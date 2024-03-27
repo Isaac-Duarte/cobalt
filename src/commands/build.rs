@@ -1,23 +1,31 @@
-use std::fs;
+use std::{fs, path::PathBuf};
 use miette::Result;
 
-use crate::{cli::BuildCommand, compiler::{codegen, parser::Parser}};
+use crate::{cli::BuildCommand, compiler::{codegen, parser::Parser}, config::BuildConfig, linker::Linker};
 
 /// Builds the provided COBOL file.
-pub(crate) fn run_build(args: &BuildCommand) -> Result<()> {
+pub(crate) fn run_build(args: BuildCommand) -> Result<()> {
+    // Create a build configuration from the passed arguments.
+    let cfg = BuildConfig::try_from(args)?;
+
     // Load contents of passed file.
-    let txt = fs::read_to_string(args.input()).expect("Failed to load source file from disk.");
+    let txt = fs::read_to_string(&cfg.input_file).expect("Failed to load source file from disk.");
 
     // Perform a parse pass.
-    let parser = Parser::new(args.input().to_str().unwrap(), &txt);
+    let parser = Parser::new(cfg.input_file.to_str().unwrap(), &txt);
     let (ast, literals) = parser.parse()?;
 
     // Translate the AST into Cranelift IR.
-    let mut code_gen = codegen::CodeGenerator::new(&ast).expect("Failed to create code generator.");
+    let mut code_gen = codegen::CodeGenerator::new(&cfg, &ast).expect("Failed to create code generator.");
     code_gen.translate(ast, &literals)?;
 
     // Write generated object code to file.
-    code_gen.generate();
+    let obj_path = code_gen.generate()?;
+
+    // Link.
+    let mut linker = Linker::new(&cfg)?;
+    linker.add_object(obj_path);
+    linker.link()?;
 
     Ok(())
 }

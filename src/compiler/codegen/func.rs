@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift::{codegen::ir::{types, AbiParam, ExtFuncData, ExternalName, InstBuilder, Signature}, frontend::FunctionBuilder};
+use cranelift::{codegen::ir::{types, AbiParam, InstBuilder}, frontend::FunctionBuilder};
 use cranelift_module::{DataId, Module};
 use cranelift_object::ObjectModule;
 use miette::Result;
@@ -45,7 +45,7 @@ impl<'src> FuncTranslator<'src> {
         let putchar_ref = self.module.declare_func_in_func(putchar_id, self.builder.func);
 
         // // //let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
-        let letter = self.builder.ins().iconst(types::I8, 0x20);
+        let letter = self.builder.ins().iconst(types::I8, 0x21);
         self.builder.ins().call(putchar_ref, &[letter]);
         Ok(())
     }

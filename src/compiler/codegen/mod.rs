@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use bimap::BiMap;
 /**
@@ -15,6 +15,8 @@ use cranelift_module::{DataDescription, DataId, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::Result;
 
+use crate::config::BuildConfig;
+
 use self::func::FuncTranslator;
 
 use super::parser::{Ast, LiteralId, Spanned, Stat};
@@ -23,7 +25,10 @@ mod data;
 mod func;
 
 /// Base code generator state.
-pub struct CodeGenerator {
+pub struct CodeGenerator<'cfg> {
+    /// The global configuration for this build.
+    cfg: &'cfg BuildConfig,
+
     /// Function builder context, re-used for all function builders within the module.
     builder_ctx: FunctionBuilderContext,
 
@@ -40,9 +45,9 @@ pub struct CodeGenerator {
     lit_map: HashMap<LiteralId, DataId>
 }
 
-impl CodeGenerator {
+impl<'cfg> CodeGenerator<'cfg> {
     /// Creates a new code generator based on the given AST.
-    pub fn new(ast: &Ast<'_>) -> Result<Self> {
+    pub fn new(cfg: &'cfg BuildConfig, ast: &Ast<'_>) -> Result<Self> {
         let mut flag_builder = settings::builder();
         flag_builder.set("use_colocated_libcalls", "false").unwrap();
         flag_builder.set("is_pic", "false").unwrap();
@@ -60,6 +65,7 @@ impl CodeGenerator {
         let obj_module = ObjectModule::new(obj_builder);
 
         Ok(Self {
+            cfg,
             builder_ctx: FunctionBuilderContext::new(),
             ctx: obj_module.make_context(),
             data_description: DataDescription::new(),
@@ -135,17 +141,24 @@ impl CodeGenerator {
     }
 
     /// Converts the generated Cranelift IR to object code, emitting it.
-    pub fn generate(self) {
+    /// Returns a path to the generated object file, if successful.
+    pub fn generate(self) -> Result<PathBuf> {
         // Finish the module, we're all done.
         let out_obj = self.module.finish();
+
+        // Determine the path to the output object file.
+        let mut out_path = self.cfg.out_dir.clone();
+        out_path.push(format!("{}.o", self.cfg.input_file.file_stem().unwrap().to_str().unwrap()));
 
         // Flush the output object to file.
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
-            .open("./out.o")
-            .expect("Failed to open object file to write.");
+            .open(out_path.clone())
+            .map_err(|err| miette::diagnostic!("codegen: Failed to create output object file: {}", err))?;
         std::io::Write::write_all(&mut file, &out_obj.emit().unwrap())
-            .expect("Object file write failed.");
+            .map_err(|err| miette::diagnostic!("codegen: Object file write failed: {}", err))?;
+
+        Ok(out_path)
     }
 }
