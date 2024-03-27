@@ -1,17 +1,52 @@
-use cranelift::frontend::FunctionBuilder;
+use std::collections::HashMap;
+
+use cranelift::{codegen::ir::{types, AbiParam, ExtFuncData, ExternalName, InstBuilder, Signature}, frontend::FunctionBuilder};
+use cranelift_module::{DataId, Module};
 use cranelift_object::ObjectModule;
 use miette::Result;
-use crate::compiler::parser::{Spanned, Stat};
+use crate::compiler::parser::{LiteralId, Spanned, Stat};
 
 /// Structure for translating function-level AST nodes to Cranelift IR.
 pub(super) struct FuncTranslator<'src> {
     pub builder: FunctionBuilder<'src>,
-    pub module: &'src mut ObjectModule
+    pub module: &'src mut ObjectModule,
+    pub lit_map: &'src mut HashMap<LiteralId, DataId>,
 }
 
 impl<'src> FuncTranslator<'src> {
     /// Generates Cranelift IR for a single statement from the given set of statements.
     pub fn translate(&mut self, stats: &Vec<Spanned<Stat<'src>>>) -> Result<()> {
+        for stat in stats {
+            self.translate_stat(stat)?;
+        }
+        Ok(())
+    }
+
+    /// Generates Cranelift IR for a single statement from the given set of statements.
+    fn translate_stat(&mut self, stat: &Spanned<Stat<'src>>) -> Result<()> {
+        match stat.0 {
+            Stat::Display(lit_id) => self.translate_display(lit_id)?,
+            Stat::_Placeholder(_) => unreachable!()
+        }
+        Ok(())
+    }
+
+    /// Generates Cranelift IR for a single "DISPLAY" statement.
+    fn translate_display(&mut self, lit_id: usize) -> Result<()> {
+        // Declare a reference to the string for this display.
+        //let string_gv = self.module.declare_data_in_func(*self.lit_map.get(&lit_id).unwrap(), self.builder.func);
+
+        // Call "putchar" on test data.
+        //let ptr_type = self.module.target_config().pointer_type();
+        let mut putchar_sig = self.module.make_signature();
+        putchar_sig.params.push(AbiParam::new(types::I8));
+        putchar_sig.returns.push(AbiParam::new(types::I32));
+        let putchar_id = self.module.declare_function("putchar", cranelift_module::Linkage::Import, &putchar_sig).unwrap();
+        let putchar_ref = self.module.declare_func_in_func(putchar_id, self.builder.func);
+
+        // // //let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
+        let letter = self.builder.ins().iconst(types::I8, 0x20);
+        self.builder.ins().call(putchar_ref, &[letter]);
         Ok(())
     }
 }

@@ -3,6 +3,7 @@
  */
 use std::iter::Peekable;
 
+use bimap::BiMap;
 use miette::{Result, NamedSource, SourceSpan};
 use self::token::{tok, Lexer, Token};
 use crate::compiler::parser::err::GenericParseError;
@@ -32,13 +33,26 @@ pub(crate) use stat::Stat;
 /// Simple span types for use in AST items throughout the parser.
 pub type Span = SourceSpan;
 pub type Spanned<T> = (T, Span);
+pub type LiteralId = usize;
 
 /// Represents a single compile unit parser for Cobalt.
 pub(crate) struct Parser<'src> {
+    /// The full input source for the compile unit.
     input: &'src str,
+
+    /// The name of the compile unit (usually the file name).
     cu_name: &'src str,
+
+    /// Lexer iterator for tokens produced.
     tokens: Peekable<Lexer<'src>>,
-    cur: Option<Spanned<Token>>
+
+    /// The current token the parser is pointed at.
+    cur: Option<Spanned<Token>>,
+
+    /// Map of literal IDs to string literals created by this parser.
+    /// This is required as we need some access to a global list of string
+    /// literals in order to determine the strings to store in `.data` later on.
+    literal_map: BiMap<LiteralId, String>
 }
 
 impl<'src> Parser<'src> {
@@ -48,8 +62,16 @@ impl<'src> Parser<'src> {
             input,
             cu_name,
             tokens: Lexer::new(input).peekable(),
-            cur: None
+            cur: None,
+            literal_map: BiMap::new()
         }
+    }
+
+    /// Performs a full parse of the compile unit, returning an AST and literal map.
+    pub fn parse(mut self) -> Result<(Ast<'src>, BiMap<LiteralId, String>)> {
+        let ast = self.ast()?;
+        let literals = self.literal_map;
+        Ok((ast, literals))
     }
 
     //Returns the text for the provided token's span.
@@ -147,6 +169,16 @@ impl<'src> Parser<'src> {
         txt = txt.replace("\\r", "\r");
         txt = txt.replace("\\t", "\t");
         Ok(txt)
+    }
+
+    /// Inserts the given string literal into the literal table.
+    fn insert_literal(&mut self, val: String) -> LiteralId {
+        if self.literal_map.contains_right(&val) {
+            return *self.literal_map.get_by_right(&val).unwrap();
+        }
+        let id = self.literal_map.len();
+        self.literal_map.insert(id, val);
+        id
     }
 
     //Returns the source code being parsed as a NamedSource.

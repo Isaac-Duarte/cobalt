@@ -1,18 +1,25 @@
+use std::collections::HashMap;
+
+use bimap::BiMap;
+/**
+ * Structures and utilities for converting parsed ASTs into Cranelift IR.
+ */
 use cranelift::{
     codegen::{
         ir::{AbiParam, InstBuilder},
-        settings::{self, Configurable},
+        settings::{self, Configurable}, verify_function,
     },
     frontend::{FunctionBuilder, FunctionBuilderContext},
 };
-use cranelift_module::{DataDescription, Module};
+use cranelift_module::{DataDescription, DataId, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::Result;
 
 use self::func::FuncTranslator;
 
-use super::parser::{Ast, Spanned, Stat};
+use super::parser::{Ast, LiteralId, Spanned, Stat};
 
+mod data;
 mod func;
 
 /// Base code generator state.
@@ -28,6 +35,9 @@ pub struct CodeGenerator {
 
     /// The main module.
     module: ObjectModule,
+
+    /// Map of AST static data definitions to object data.
+    lit_map: HashMap<LiteralId, DataId>
 }
 
 impl CodeGenerator {
@@ -54,11 +64,16 @@ impl CodeGenerator {
             ctx: obj_module.make_context(),
             data_description: DataDescription::new(),
             module: obj_module,
+            lit_map: HashMap::new()
         })
     }
 
     /// Generates Cranelift IR from the given AST, consuming it.
-    pub fn translate(&mut self, ast: Ast) -> Result<()> {
+    pub fn translate(&mut self, ast: Ast, literals: &BiMap<LiteralId, String>) -> Result<()> {
+        // Process all literals into static object data references.
+        self.lit_map = data::upload_literals(&mut self.module, literals)?;
+
+        // Translate all functions.
         self.translate_fn("main", &ast.proc_div.stats)?;
         Ok(())
     }
@@ -71,11 +86,12 @@ impl CodeGenerator {
         self.ctx.func.signature.returns.push(AbiParam::new(int));
 
         // Declare the function in the module.
+        // Must be "export" for ld.
         let func_id = self
             .module
             .declare_function(
                 name,
-                cranelift_module::Linkage::Local,
+                cranelift_module::Linkage::Export,
                 &self.ctx.func.signature,
             )
             .expect("Failed to declare function!");
@@ -96,6 +112,7 @@ impl CodeGenerator {
             let mut trans = FuncTranslator {
                 builder,
                 module: &mut self.module,
+                lit_map: &mut self.lit_map
             };
             trans.translate(stats)?;
 
@@ -111,6 +128,8 @@ impl CodeGenerator {
         self.module
             .define_function(func_id, &mut self.ctx)
             .expect("Failed to define function body.");
+        verify_function(&self.ctx.func, self.module.isa()).unwrap();
+        println!("{}", self.ctx.func.display());
         self.module.clear_context(&mut self.ctx);
         Ok(())
     }

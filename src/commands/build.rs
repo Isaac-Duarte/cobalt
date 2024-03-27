@@ -9,14 +9,12 @@ pub(crate) fn run_build(args: &BuildCommand) -> Result<()> {
     let txt = fs::read_to_string(args.input()).expect("Failed to load source file from disk.");
 
     // Perform a parse pass.
-    let ast = {
-        let mut parser = Parser::new(args.input().to_str().unwrap(), &txt);
-        parser.ast()?
-    };
+    let parser = Parser::new(args.input().to_str().unwrap(), &txt);
+    let (ast, literals) = parser.parse()?;
 
     // Translate the AST into Cranelift IR.
     let mut code_gen = codegen::CodeGenerator::new(&ast).expect("Failed to create code generator.");
-    code_gen.translate(ast)?;
+    code_gen.translate(ast, &literals)?;
 
     // Write generated object code to file.
     code_gen.generate();

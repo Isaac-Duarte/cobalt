@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bimap = "0.6.3"
 clap = { version = "4.5.1", features = ["derive"] }
 cranelift = "0.105.1"
 cranelift-module = "0.105.3"
