@@ -34,19 +34,18 @@ impl<'src> FuncTranslator<'src> {
     /// Generates Cranelift IR for a single "DISPLAY" statement.
     fn translate_display(&mut self, lit_id: usize) -> Result<()> {
         // Declare a reference to the string for this display.
-        //let string_gv = self.module.declare_data_in_func(*self.lit_map.get(&lit_id).unwrap(), self.builder.func);
+        let string_gv = self.module.declare_data_in_func(*self.lit_map.get(&lit_id).unwrap(), self.builder.func);
 
         // Call "putchar" on test data.
-        //let ptr_type = self.module.target_config().pointer_type();
+        let ptr_type = self.module.target_config().pointer_type();
         let mut putchar_sig = self.module.make_signature();
-        putchar_sig.params.push(AbiParam::new(types::I8));
+        putchar_sig.params.push(AbiParam::new(ptr_type));
         putchar_sig.returns.push(AbiParam::new(types::I32));
-        let putchar_id = self.module.declare_function("putchar", cranelift_module::Linkage::Import, &putchar_sig).unwrap();
-        let putchar_ref = self.module.declare_func_in_func(putchar_id, self.builder.func);
+        let puts_id = self.module.declare_function("puts", cranelift_module::Linkage::Import, &putchar_sig).unwrap();
+        let puts_ref = self.module.declare_func_in_func(puts_id, self.builder.func);
 
-        // // //let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
-        let letter = self.builder.ins().iconst(types::I8, 0x21);
-        self.builder.ins().call(putchar_ref, &[letter]);
+        let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
+        self.builder.ins().call(puts_ref, &[string_ptr]);
         Ok(())
     }
 }

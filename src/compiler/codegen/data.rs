@@ -8,7 +8,7 @@ use cranelift_object::ObjectModule;
 use crate::compiler::parser::LiteralId;
 
 /**
- * Structures and utilities for configuring the .data layout
+ * Structures and utilities for configuring the static data layout
  * within output Cranelift objects.
  */
 

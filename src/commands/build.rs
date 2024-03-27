@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::fs;
 use miette::Result;
 
 use crate::{cli::BuildCommand, compiler::{codegen, parser::Parser}, config::BuildConfig, linker::Linker};
