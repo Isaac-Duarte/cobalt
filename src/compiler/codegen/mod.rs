@@ -7,7 +7,8 @@ use bimap::BiMap;
 use cranelift::{
     codegen::{
         ir::{AbiParam, InstBuilder},
-        settings::{self, Configurable}, verify_function,
+        settings::{self, Configurable},
+        verify_function,
     },
     frontend::{FunctionBuilder, FunctionBuilderContext},
 };
@@ -42,7 +43,7 @@ pub struct CodeGenerator<'cfg> {
     module: ObjectModule,
 
     /// Map of AST static data definitions to object data.
-    lit_map: HashMap<LiteralId, DataId>
+    lit_map: HashMap<LiteralId, DataId>,
 }
 
 impl<'cfg> CodeGenerator<'cfg> {
@@ -70,7 +71,7 @@ impl<'cfg> CodeGenerator<'cfg> {
             ctx: obj_module.make_context(),
             data_description: DataDescription::new(),
             module: obj_module,
-            lit_map: HashMap::new()
+            lit_map: HashMap::new(),
         })
     }
 
@@ -118,7 +119,7 @@ impl<'cfg> CodeGenerator<'cfg> {
             let mut trans = FuncTranslator {
                 builder,
                 module: &mut self.module,
-                lit_map: &mut self.lit_map
+                lit_map: &mut self.lit_map,
             };
             trans.translate(stats)?;
 
@@ -133,9 +134,15 @@ impl<'cfg> CodeGenerator<'cfg> {
         // Define the function from the built function held in ctx.
         self.module
             .define_function(func_id, &mut self.ctx)
-            .expect("Failed to define function body.");
-        verify_function(&self.ctx.func, self.module.isa()).unwrap();
+            .map_err(|err| {
+                miette::diagnostic!("codegen: Failed to define function body: {}", err)
+            })?;
+
+        // Verify that the function is valid.
+        verify_function(&self.ctx.func, self.module.isa())
+            .map_err(|err| miette::diagnostic!("codegen: Function verification failed: {}", err))?;
         println!("{}", self.ctx.func.display());
+
         self.module.clear_context(&mut self.ctx);
         Ok(())
     }
@@ -148,14 +155,19 @@ impl<'cfg> CodeGenerator<'cfg> {
 
         // Determine the path to the output object file.
         let mut out_path = self.cfg.out_dir.clone();
-        out_path.push(format!("{}.o", self.cfg.input_file.file_stem().unwrap().to_str().unwrap()));
+        out_path.push(format!(
+            "{}.o",
+            self.cfg.input_file.file_stem().unwrap().to_str().unwrap()
+        ));
 
         // Flush the output object to file.
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
             .open(out_path.clone())
-            .map_err(|err| miette::diagnostic!("codegen: Failed to create output object file: {}", err))?;
+            .map_err(|err| {
+                miette::diagnostic!("codegen: Failed to create output object file: {}", err)
+            })?;
         std::io::Write::write_all(&mut file, &out_obj.emit().unwrap())
             .map_err(|err| miette::diagnostic!("codegen: Object file write failed: {}", err))?;
 

@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 /// Top level CLI options for the compiler.
 #[derive(Parser)]
@@ -19,7 +19,7 @@ impl Cli {
 /// All available subcommands within cobalt.
 #[derive(Subcommand)]
 pub enum Command {
-    Build(BuildCommand)
+    Build(BuildCommand),
 }
 
 #[derive(Parser)]
@@ -42,7 +42,7 @@ pub struct BuildCommand {
     /// Set the verbosity of compiler output. Can be specified
     /// multiple times.
     #[arg(short, long, action = clap::ArgAction::Count)]
-    verbose: u8
+    verbose: u8,
 }
 
 impl BuildCommand {

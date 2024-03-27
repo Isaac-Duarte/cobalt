@@ -1,7 +1,12 @@
-use std::fs;
 use miette::Result;
+use std::fs;
 
-use crate::{cli::BuildCommand, compiler::{codegen, parser::Parser}, config::BuildConfig, linker::Linker};
+use crate::{
+    cli::BuildCommand,
+    compiler::{codegen, parser::Parser},
+    config::BuildConfig,
+    linker::Linker,
+};
 
 /// Builds the provided COBOL file.
 pub(crate) fn run_build(args: BuildCommand) -> Result<()> {
@@ -16,7 +21,8 @@ pub(crate) fn run_build(args: BuildCommand) -> Result<()> {
     let (ast, literals) = parser.parse()?;
 
     // Translate the AST into Cranelift IR.
-    let mut code_gen = codegen::CodeGenerator::new(&cfg, &ast).expect("Failed to create code generator.");
+    let mut code_gen =
+        codegen::CodeGenerator::new(&cfg, &ast).expect("Failed to create code generator.");
     code_gen.translate(ast, &literals)?;
 
     // Write generated object code to file.

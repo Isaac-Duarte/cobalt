@@ -2,7 +2,6 @@
  * Structures for linking a final executable from one (or more)
  * compiled object files.
  */
-
 use std::{path::PathBuf, process::Command};
 
 use miette::Result;
@@ -22,7 +21,7 @@ pub(crate) struct Linker<'cfg> {
     user_objects: Vec<PathBuf>,
 
     /// Platform-specific linker configuration.
-    platform_config: PlatformConfig
+    platform_config: PlatformConfig,
 }
 
 impl<'cfg> Linker<'cfg> {
@@ -31,7 +30,7 @@ impl<'cfg> Linker<'cfg> {
         Ok(Linker {
             cfg,
             user_objects: Vec::new(),
-            platform_config: PlatformConfig::new()?
+            platform_config: PlatformConfig::new()?,
         })
     }
 
@@ -48,7 +47,7 @@ impl<'cfg> Linker<'cfg> {
         }
 
         // Create initial `ld` command setup, specify output file name.
-        let mut ld = Command::new("ld");    
+        let mut ld = Command::new("ld");
         ld.arg("-o").arg(&self.cfg.out_file);
 
         // Linker files, in order.
@@ -67,7 +66,9 @@ impl<'cfg> Linker<'cfg> {
 
         // Specify the dynamic linker to use (if present).
         match self.platform_config.dyn_linker() {
-            Some(dyn_linker) => { ld.arg(format!("-dynamic-linker={}", dyn_linker.to_str().unwrap())); },
+            Some(dyn_linker) => {
+                ld.arg(format!("-dynamic-linker={}", dyn_linker.to_str().unwrap()));
+            }
             None => {}
         }
 
