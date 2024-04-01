@@ -3,24 +3,25 @@
  */
 use std::iter::Peekable;
 
-use bimap::BiMap;
-use miette::{Result, NamedSource, SourceSpan};
 use self::token::{tok, Lexer, Token};
 use crate::compiler::parser::err::GenericParseError;
+use bimap::BiMap;
+use miette::{NamedSource, Result, SourceSpan};
 
-mod token;
 mod ast;
+mod data;
 mod divs;
 mod err;
 mod stat;
+mod token;
 
 //Macro for exiting with a given parser error message.
 macro_rules! parser_bail {
-    ($parser:ident, $msg:tt) => {{
+    ($parser:expr, $msg:tt) => {{
         return Err(GenericParseError::new($parser, format!($msg)))?
     }};
 
-    ($parser:ident, $msg:tt, $($arg:tt)*) => {{
+    ($parser:expr, $msg:tt, $($arg:tt)*) => {{
         return Err(GenericParseError::new($parser, format!($msg, $($arg)*)))?
     }};
 }
@@ -52,7 +53,7 @@ pub(crate) struct Parser<'src> {
     /// Map of literal IDs to string literals created by this parser.
     /// This is required as we need some access to a global list of string
     /// literals in order to determine the strings to store in `.data` later on.
-    literal_map: BiMap<LiteralId, String>
+    literal_map: BiMap<LiteralId, String>,
 }
 
 impl<'src> Parser<'src> {
@@ -63,7 +64,7 @@ impl<'src> Parser<'src> {
             cu_name,
             tokens: Lexer::new(input).peekable(),
             cur: None,
-            literal_map: BiMap::new()
+            literal_map: BiMap::new(),
         }
     }
 
@@ -86,9 +87,9 @@ impl<'src> Parser<'src> {
 
     //Returns the current token index of the parser (end of the previous token's span).
     pub fn cur_idx(&self) -> usize {
-        match self.cur { 
+        match self.cur {
             Some(tok) => tok.1.offset() + tok.1.len(),
-            None => 0
+            None => 0,
         }
     }
 
@@ -103,7 +104,7 @@ impl<'src> Parser<'src> {
     pub fn peek_idx(&mut self) -> usize {
         match self.tokens.peek() {
             Some(tok) => tok.1.offset(),
-            None => self.cur_idx()
+            None => self.cur_idx(),
         }
     }
 
@@ -171,6 +172,16 @@ impl<'src> Parser<'src> {
         Ok(txt)
     }
 
+    /// Expects the next token to be a non-padded integer literal, consumes it, and returns a
+    /// parsed version of the integer contained within. Must fit within a [`usize`], otherwise
+    /// returns an error. Similarly errors on an invalid integer value.
+    pub fn consume_int(&mut self) -> Result<usize> {
+        let lit_tok = self.consume(tok![int_lit])?;
+        let txt = self.text(lit_tok);
+        txt.parse::<usize>()
+            .ctx(self, format!("Failed to parse integer literal: {}", txt))
+    }
+
     /// Inserts the given string literal into the literal table.
     fn insert_literal(&mut self, val: String) -> LiteralId {
         if self.literal_map.contains_right(&val) {
@@ -184,5 +195,30 @@ impl<'src> Parser<'src> {
     //Returns the source code being parsed as a NamedSource.
     pub fn get_named_source(&self) -> NamedSource<String> {
         NamedSource::new(self.cu_name.to_string(), self.input.to_string())
+    }
+}
+
+//Trait for adding context to arbitrary objects to return as a result.
+pub trait ParserErrorContext<T> {
+    fn ctx(self, parser: &Parser, msg: String) -> Result<T>;
+}
+
+//Extension for allowing addition of parser context to Result objects for return.
+impl<T, E: std::error::Error> ParserErrorContext<T> for Result<T, E> {
+    fn ctx(self, parser: &Parser, msg: String) -> Result<T> {
+        match self {
+            Err(_) => Err(GenericParseError::new(parser, msg))?,
+            Ok(res) => Ok(res),
+        }
+    }
+}
+
+//Extension for allowing conversion of Options into Results, with parser context information.
+impl<T> ParserErrorContext<T> for Option<T> {
+    fn ctx(self, parser: &Parser, msg: String) -> Result<T> {
+        match self {
+            Some(val) => Ok(val),
+            None => Err(GenericParseError::new(parser, msg))?,
+        }
     }
 }

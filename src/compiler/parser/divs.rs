@@ -1,18 +1,15 @@
 use miette::Result;
-use super::{stat::Stat, token::tok, Parser, Spanned};
+use super::{data::WorkingStorageSec, stat::Stat, token::tok, Parser, Spanned};
+
+////////////////////
+// IDENT DIVISION //
+////////////////////
 
 /// The identification division of a single COBOL program.
 #[derive(Debug)]
 pub(crate) struct IdentDiv<'src> {
     /// The ID slug of the program.
     pub program_id: &'src str
-}
-
-/// The procedure division of a single COBOL program.
-#[derive(Debug)]
-pub(crate) struct ProcDiv<'src> {
-    /// Statements within the procedure division.
-    pub stats: Vec<Spanned<Stat<'src>>>
 }
 
 impl<'src> Parser<'src> {
@@ -31,9 +28,22 @@ impl<'src> Parser<'src> {
             program_id
         })
     }
+}
 
-    /// Parses a procedure division from COBOL tokens.
-    pub(super) fn proc_div(&mut self) -> Result<ProcDiv<'src>> {
+///////////////////
+// PROC DIVISION //
+///////////////////
+
+/// The procedure division of a single COBOL program.
+#[derive(Debug)]
+pub(crate) struct ProcDiv<'src> {
+    /// Statements within the procedure division.
+    pub stats: Vec<Spanned<Stat<'src>>>
+}
+
+impl<'src> Parser<'src> {
+     /// Parses a procedure division from COBOL tokens.
+     pub(super) fn proc_div(&mut self) -> Result<ProcDiv<'src>> {
         // Parse header.
         self.consume_vec(&[tok![proc_div], tok![.], tok![eol]])?;
 
@@ -58,4 +68,30 @@ impl<'src> Parser<'src> {
             stats
         })
     }
+}
+
+///////////////////
+// DATA DIVISION //
+///////////////////
+
+/// The data division of a single COBOL program.
+#[derive(Debug)]
+pub(crate) struct DataDiv<'src> {
+    /// Working storage section, where runtime-use variables are declared.
+    pub ws_section: WorkingStorageSec<'src>,
+}
+
+impl<'src> Parser<'src> {
+    /// Parses a procedure division from COBOL tokens.
+    pub(super) fn data_div(&mut self) -> Result<DataDiv<'src>> {
+        // Consume header.
+        self.consume_vec(&[tok![data_div], tok![.], tok![eol]])?;
+
+        // Working storage section.
+        let ws_section = self.ws_section()?;
+
+        Ok(DataDiv {
+            ws_section
+        })
+   }
 }

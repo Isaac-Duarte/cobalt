@@ -6,12 +6,18 @@ use std::fmt::Display;
 #[rustfmt::skip]
 macro_rules! tok {
     [ident_div] => { $crate::compiler::parser::Token::IdentDiv };
+    [data_div] => { $crate::compiler::parser::Token::DataDiv };
     [proc_div] => { $crate::compiler::parser::Token::ProcDiv };
+    [ws_section] => { $crate::compiler::parser::Token::WsSection };
+    [pic] => { $crate::compiler::parser::Token::Pic };
+    [value] => { $crate::compiler::parser::Token::Value };
     [program_id] => { $crate::compiler::parser::Token::ProgramId };
     [stop_run] => { $crate::compiler::parser::Token::StopRun };
     [display] => { $crate::compiler::parser::Token::Display };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
+    [int_lit] => { $crate::compiler::parser::Token::IntLiteral };
     [str_literal] => { $crate::compiler::parser::Token::StringLiteral };
+    [pic_clause] => { $crate::compiler::parser::Token::PicClause };
     [ident] => { $crate::compiler::parser::Token::Identifier };
     [eol] => { $crate::compiler::parser::Token::EOL };
     [eof] => { $crate::compiler::parser::Token::EOF };
@@ -74,8 +80,16 @@ impl<'src> Iterator for Lexer<'src> {
 pub(crate) enum Token {
     #[token("IDENTIFICATION DIVISION")]
     IdentDiv,
+    #[token("DATA DIVISION")]
+    DataDiv,
     #[token("PROCEDURE DIVISION")]
     ProcDiv,
+    #[token("WORKING-STORAGE SECTION")]
+    WsSection,
+    #[token("PIC")]
+    Pic,
+    #[token("VALUE")]
+    Value,
     #[token("PROGRAM-ID")]
     ProgramId,
     #[token("STOP RUN")]
@@ -84,10 +98,16 @@ pub(crate) enum Token {
     Display,
     #[token(".")]
     CtrlDot,
+    #[regex(r#"(-)?[0-9]+"#, priority = 5)]
+    IntLiteral,
     #[regex(r#""((\[.])|[^\"])*""#)]
     #[regex(r#"'((\[.])|[^\'])*'"#)]
     StringLiteral,
-    #[regex(r#"([A-Z0-9]+(-)?)*[A-Z0-9]+"#)]
+    #[regex(r#"([9AXVSP](\([0-9]+\))?)+"#, priority = 3)]
+    PicClause,
+    // This is technically incorrect for now, but Logos doesn't like the correct regex of:
+    // [A-Z0-9][A-Z0-9-]*[A-Z0-9]|[A-Z0-9]+
+    #[regex(r#"[A-Z0-9][A-Z0-9-]+"#)]
     Identifier,
     #[regex(r"//[^\n]*")]
     SingleLineComment,
@@ -104,12 +124,18 @@ impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Token::IdentDiv => write!(f, "IDENTIFICATION DIVISION"),
+            Token::DataDiv => write!(f, "DATA DIVISION"),
             Token::ProcDiv => write!(f, "PROCEDURE DIVISION"),
+            Token::WsSection => write!(f, "WORKING-STORAGE SECTION"),
+            Token::Pic => write!(f, "PIC"),
+            Token::Value => write!(f, "VALUE"),
             Token::ProgramId => write!(f, "PROGRAM-ID"),
             Token::StopRun => write!(f, "STOP RUN"),
             Token::Display => write!(f, "DISPLAY"),
             Token::CtrlDot => write!(f, "."),
+            Token::IntLiteral => write!(f, "int-literal"),
             Token::StringLiteral => write!(f, "string-literal"),
+            Token::PicClause => write!(f, "pic-clause"),
             Token::Identifier => write!(f, "identifier"),
             Token::EOL => write!(f, "EOL"),
             Token::EOF => write!(f, "EOF"),

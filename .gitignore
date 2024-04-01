@@ -1,4 +1,7 @@
 /target
 
+# Editor artifacts.
+.vscode/
+
 # Output artifacts.
 /out
