@@ -65,7 +65,7 @@ impl<'src> Parser<'src> {
 }
 
 /// Represents a single "PIC" data layout description.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Pic {
     /// The requested layout format, in chunks.
     pub layout_chunks: Vec<PicLayoutChunk>,
@@ -75,7 +75,7 @@ pub(crate) struct Pic {
 }
 
 /// Represents a single chunk within a PIC layout.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct PicLayoutChunk {
     /// The length of the chunk.
     pub len: usize,
