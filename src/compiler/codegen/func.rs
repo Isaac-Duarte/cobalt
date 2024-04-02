@@ -1,15 +1,13 @@
-use std::collections::HashMap;
-
-use crate::compiler::parser::{LiteralId, Spanned, Stat};
-use cranelift::{
-    codegen::ir::InstBuilder,
-    frontend::FunctionBuilder,
-};
-use cranelift_module::{DataId, Module};
+use crate::compiler::parser::{Spanned, Stat};
+use cranelift::{codegen::ir::InstBuilder, frontend::FunctionBuilder};
+use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 use miette::Result;
 
-use super::intrinsics::{CobaltIntrinsic, IntrinsicManager};
+use super::{
+    data::DataManager,
+    intrinsics::{CobaltIntrinsic, IntrinsicManager},
+};
 
 /// Structure for translating function-level AST nodes to Cranelift IR.
 pub(super) struct FuncTranslator<'src> {
@@ -22,8 +20,8 @@ pub(super) struct FuncTranslator<'src> {
     /// The intrinsics manager for this function.
     pub intrinsics: &'src mut IntrinsicManager,
 
-    /// Map of literal data available to the function.
-    pub lit_map: &'src mut HashMap<LiteralId, DataId>,
+    /// The data manager for this function.
+    pub data: &'src mut DataManager,
 }
 
 impl<'src> FuncTranslator<'src> {
@@ -53,7 +51,7 @@ impl<'src> FuncTranslator<'src> {
         // Declare a reference to the string for this display.
         let string_gv = self
             .module
-            .declare_data_in_func(*self.lit_map.get(&lit_id).unwrap(), self.builder.func);
+            .declare_data_in_func(self.data.str_data_id(lit_id).unwrap(), self.builder.func);
 
         // Call "puts" on the string.
         let puts = self.intrinsics.get_ref(self.module, self.builder.func, CobaltIntrinsic::LibcPuts)?;

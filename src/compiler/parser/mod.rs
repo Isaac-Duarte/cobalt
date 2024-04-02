@@ -53,7 +53,7 @@ pub(crate) struct Parser<'src> {
     /// Map of literal IDs to string literals created by this parser.
     /// This is required as we need some access to a global list of string
     /// literals in order to determine the strings to store in `.data` later on.
-    literal_map: BiMap<LiteralId, String>,
+    str_lit_map: BiMap<LiteralId, String>,
 }
 
 impl<'src> Parser<'src> {
@@ -64,15 +64,13 @@ impl<'src> Parser<'src> {
             cu_name,
             tokens: Lexer::new(input).peekable(),
             cur: None,
-            literal_map: BiMap::new(),
+            str_lit_map: BiMap::new(),
         }
     }
 
-    /// Performs a full parse of the compile unit, returning an AST and literal map.
-    pub fn parse(mut self) -> Result<(Ast<'src>, BiMap<LiteralId, String>)> {
-        let ast = self.ast()?;
-        let literals = self.literal_map;
-        Ok((ast, literals))
+    /// Performs a full parse of the compile unit, returning an AST.
+    pub fn parse(self) -> Result<Ast<'src>> {
+        Ok(self.ast()?)
     }
 
     //Returns the text for the provided token's span.
@@ -184,11 +182,11 @@ impl<'src> Parser<'src> {
 
     /// Inserts the given string literal into the literal table.
     fn insert_literal(&mut self, val: String) -> LiteralId {
-        if self.literal_map.contains_right(&val) {
-            return *self.literal_map.get_by_right(&val).unwrap();
+        if self.str_lit_map.contains_right(&val) {
+            return *self.str_lit_map.get_by_right(&val).unwrap();
         }
-        let id = self.literal_map.len();
-        self.literal_map.insert(id, val);
+        let id = self.str_lit_map.len();
+        self.str_lit_map.insert(id, val);
         id
     }
 

@@ -1,6 +1,5 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
-use bimap::BiMap;
 /**
  * Structures and utilities for converting parsed ASTs into Cranelift IR.
  */
@@ -12,24 +11,29 @@ use cranelift::{
     },
     frontend::{FunctionBuilder, FunctionBuilderContext},
 };
-use cranelift_module::{DataDescription, DataId, Module};
+use cranelift_module::Module;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::Result;
 
 use crate::config::BuildConfig;
 
-use self::{func::FuncTranslator, intrinsics::IntrinsicManager};
+use self::{data::DataManager, func::FuncTranslator, intrinsics::IntrinsicManager};
 
-use super::parser::{Ast, LiteralId, Spanned, Stat};
+use super::parser::{Ast, Spanned, Stat};
 
 mod data;
 mod func;
 mod intrinsics;
 
 /// Base code generator state.
-pub struct CodeGenerator<'cfg> {
+pub struct CodeGenerator<'cfg, 'src> {
     /// The global configuration for this build.
     cfg: &'cfg BuildConfig,
+
+    /// The AST this code generator is translating.
+    /// This is wrapped in an [`Option`] for ownership purposes, when the translation
+    /// is complete this field becomes [`None`].
+    ast: Option<Ast<'src>>,
 
     /// Function builder context, re-used for all function builders within the module.
     builder_ctx: FunctionBuilderContext,
@@ -37,22 +41,19 @@ pub struct CodeGenerator<'cfg> {
     /// Main Cranelift context. Holds the codegen state, separate from the module.
     ctx: cranelift::codegen::Context,
 
-    /// Data context for functions.
-    data_description: DataDescription,
-
     /// The main module.
     module: ObjectModule,
 
     /// Intrinsics manager for this module.
     intrinsics: IntrinsicManager,
 
-    /// Map of AST static data definitions to object data.
-    lit_map: HashMap<LiteralId, DataId>,
+    /// Manages object data for this module.
+    data_manager: DataManager,
 }
 
-impl<'cfg> CodeGenerator<'cfg> {
+impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
     /// Creates a new code generator based on the given AST.
-    pub fn new(cfg: &'cfg BuildConfig, ast: &Ast<'_>) -> Result<Self> {
+    pub fn new(cfg: &'cfg BuildConfig, ast: Ast<'src>) -> Result<Self> {
         let mut flag_builder = settings::builder();
         flag_builder.set("use_colocated_libcalls", "false").unwrap();
         flag_builder.set("is_pic", "false").unwrap();
@@ -71,19 +72,20 @@ impl<'cfg> CodeGenerator<'cfg> {
 
         Ok(Self {
             cfg,
+            ast: Some(ast),
             builder_ctx: FunctionBuilderContext::new(),
             ctx: obj_module.make_context(),
-            data_description: DataDescription::new(),
             module: obj_module,
             intrinsics: IntrinsicManager::new(),
-            lit_map: HashMap::new(),
+            data_manager: DataManager::new(),
         })
     }
 
     /// Generates Cranelift IR from the given AST, consuming it.
-    pub fn translate(&mut self, ast: Ast, literals: &BiMap<LiteralId, String>) -> Result<()> {
-        // Process all literals into static object data references.
-        self.lit_map = data::upload_literals(&mut self.module, literals)?;
+    pub fn translate(&mut self) -> Result<()> {
+        // Process all AST literal/variable data into Cranelift object data.
+        let ast = self.ast.take().unwrap();
+        self.data_manager.upload(&mut self.module, &ast)?;
 
         // Translate all functions.
         self.translate_fn("main", &ast.proc_div.stats)?;
@@ -91,7 +93,7 @@ impl<'cfg> CodeGenerator<'cfg> {
     }
 
     /// Generates a single function from the AST, given a name & list of statements.
-    fn translate_fn<'src>(&mut self, name: &str, stats: &Vec<Spanned<Stat<'src>>>) -> Result<()> {
+    fn translate_fn(&mut self, name: &str, stats: &Vec<Spanned<Stat<'src>>>) -> Result<()> {
         // Create "main" function for later linking.
         // Returns int, has no parameters.
         let int = self.module.target_config().pointer_type();
@@ -125,7 +127,7 @@ impl<'cfg> CodeGenerator<'cfg> {
                 builder,
                 module: &mut self.module,
                 intrinsics: &mut self.intrinsics,
-                lit_map: &mut self.lit_map,
+                data: &mut self.data_manager,
             };
             trans.translate(stats)?;
 

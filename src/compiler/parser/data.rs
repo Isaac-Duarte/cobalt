@@ -76,7 +76,7 @@ pub(crate) struct Pic {
 
 /// Represents a single chunk within a PIC layout.
 #[derive(Debug)]
-struct PicLayoutChunk {
+pub(crate) struct PicLayoutChunk {
     /// The length of the chunk.
     pub len: usize,
 
@@ -86,7 +86,7 @@ struct PicLayoutChunk {
 
 /// Available types of layout chunks for PIC variables.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PicChunkType {
+pub(crate) enum PicChunkType {
     Sign,
     ImplicitDecimalPoint,
     DecimalPoint,
@@ -115,7 +115,7 @@ impl PicChunkType {
 }
 
 /// Mini-parser for interpreting PIC layout strings.
-struct PicParser<'src, 'prs> {
+pub(super) struct PicParser<'src, 'prs> {
     /// The main parser.
     parser: &'prs mut Parser<'src>,
 

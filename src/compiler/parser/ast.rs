@@ -1,5 +1,6 @@
+use bimap::BiMap;
 use miette::Result;
-use super::{divs::{DataDiv, IdentDiv, ProcDiv}, token::Token, Parser};
+use super::{divs::{DataDiv, IdentDiv, ProcDiv}, token::Token, LiteralId, Parser};
 
 /// Represents the overall AST of a COBOL program.
 #[derive(Debug)]
@@ -11,12 +12,15 @@ pub struct Ast<'src> {
     pub data_div: Option<DataDiv<'src>>,
 
     // The procedure division of the program.
-    pub proc_div: ProcDiv<'src>
+    pub proc_div: ProcDiv<'src>,
+
+    // Map of string literals used throughout the AST.
+    pub str_lits: BiMap<LiteralId, String>
 }
 
 impl<'src> Parser<'src> {
     /// Parses a complete AST from the current parser position.
-    pub(crate) fn ast(&mut self) -> Result<Ast<'src>> {
+    pub(super) fn ast(mut self) -> Result<Ast<'src>> {
         // Extract each division.
         let ident_div = self.ident_div()?;
         let data_div = match self.peek() {
@@ -28,7 +32,8 @@ impl<'src> Parser<'src> {
         Ok(Ast {
             ident_div,
             data_div,
-            proc_div
+            proc_div,
+            str_lits: self.str_lit_map
         })
     }
 }
