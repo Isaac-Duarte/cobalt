@@ -5,7 +5,7 @@ use cranelift_module::{DataDescription, DataId, Module};
 use cranelift_object::ObjectModule;
 use miette::Result;
 
-use crate::compiler::parser::{Ast, DataDiv, LiteralId, Pic};
+use crate::compiler::parser::{Ast, DataDiv, Literal, Pic, StrLitId};
 
 /**
  * Structures and utilities for configuring the static data layout
@@ -21,7 +21,7 @@ pub(super) struct DataManager {
     sym_map: HashMap<String, (DataId, Pic)>,
 
     /// A map of all string literals within the program to a Cranelift data symbol.
-    str_lit_map: HashMap<LiteralId, DataId>,
+    str_lit_map: HashMap<StrLitId, DataId>,
 }
 
 impl DataManager {
@@ -41,7 +41,7 @@ impl DataManager {
         ast: &Ast<'src>,
     ) -> Result<()> {
         if let Some(data_div) = ast.data_div.as_ref() {
-            self.upload_vars(module, data_div)?;
+            self.upload_vars(module, &ast.str_lits, data_div)?;
         }
         self.upload_str_lits(module, &ast.str_lits)?;
         Ok(())
@@ -58,7 +58,7 @@ impl DataManager {
     }
 
     /// Returns the Cranelift [`DataId`] associated with the given [`LiteralId`].
-    pub(super) fn str_data_id(&self, lit_id: LiteralId) -> Option<DataId> {
+    pub(super) fn str_data_id(&self, lit_id: StrLitId) -> Option<DataId> {
         self.str_lit_map.get(&lit_id).map(|o| *o)
     }
 
@@ -67,6 +67,7 @@ impl DataManager {
     fn upload_vars<'src>(
         &mut self,
         module: &mut ObjectModule,
+        str_lits: &BiMap<StrLitId, String>,
         data_div: &DataDiv<'src>,
     ) -> Result<()> {
         let mut desc = DataDescription::new();
@@ -77,14 +78,19 @@ impl DataManager {
                 .map_err(|err| miette::diagnostic!("Failed to declare data for symbol '{}': {}", elem_var.name, err))?;
             desc.clear();
 
-            // For now, no initial values, so just declare as zeroes.
-            let mut init_data: Vec<u8> = Vec::new();
-            for _ in 0..elem_var.pic.byte_len {
-                init_data.push(0x0);
+            // Declare the data description of the variable.
+            match &elem_var.initial_val {
+                Some(init_val) => {
+                    let init_data = self.create_init_val(&elem_var.pic, init_val, str_lits);
+                    desc.define(init_data.into_boxed_slice());
+                },
+                None => {
+                    // No initial value, so declare as zeroed out.
+                    desc.define_zeroinit(elem_var.pic.comp_size());
+                }
             }
 
             // Define the data within the object.
-            desc.define(init_data.into_boxed_slice());
             module.define_data(data_id, &desc).map_err(|err| {
                 miette::diagnostic!("Failed to define data for symbol '{}': {}", elem_var.name, err)
             })?;
@@ -96,12 +102,32 @@ impl DataManager {
         Ok(())
     }
 
+    /// Creates the initial byte value for a single COBOL variable.
+    fn create_init_val(&self, pic: &Pic, lit: &Literal, str_lits: &BiMap<StrLitId, String>) -> Vec<u8> {
+        match lit {
+            Literal::Float(f) => {
+                f.to_ne_bytes().to_vec()
+            },
+            Literal::Int(i) => {
+                i.to_ne_bytes().to_vec()
+            },
+            Literal::String(id) => {
+                let str = str_lits.get_by_left(id).unwrap();
+                let mut init_data = str.clone().into_bytes();
+                while init_data.len() < pic.comp_size() {
+                    init_data.push(0x0);
+                }
+                init_data
+            }
+        }
+    }
+
     /// Uploads the set of string literals used within the program to the object file.
     /// Registers all string literals within the object manager as offsets in a data block.
     fn upload_str_lits(
         &mut self,
         module: &mut ObjectModule,
-        literals: &BiMap<LiteralId, String>,
+        literals: &BiMap<StrLitId, String>,
     ) -> Result<()> {
         let mut desc = DataDescription::new();
         for (lit_id, literal) in literals.iter() {

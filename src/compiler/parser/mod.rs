@@ -12,17 +12,18 @@ mod ast;
 mod data;
 mod divs;
 mod err;
+mod lits;
 mod stat;
 mod token;
 
 //Macro for exiting with a given parser error message.
 macro_rules! parser_bail {
     ($parser:expr, $msg:tt) => {{
-        return Err(GenericParseError::new($parser, format!($msg)))?
+        return Err($crate::compiler::parser::GenericParseError::new($parser, format!($msg)))?
     }};
 
     ($parser:expr, $msg:tt, $($arg:tt)*) => {{
-        return Err(GenericParseError::new($parser, format!($msg, $($arg)*)))?
+        return Err($crate::compiler::parser::GenericParseError::new($parser, format!($msg, $($arg)*)))?
     }};
 }
 pub(crate) use parser_bail;
@@ -31,12 +32,12 @@ pub(crate) use parser_bail;
 pub use ast::Ast;
 pub(crate) use data::*;
 pub(crate) use divs::*;
+pub(crate) use lits::*;
 pub(crate) use stat::Stat;
 
 /// Simple span types for use in AST items throughout the parser.
 pub type Span = SourceSpan;
 pub type Spanned<T> = (T, Span);
-pub type LiteralId = usize;
 
 /// Represents a single compile unit parser for Cobalt.
 pub(crate) struct Parser<'src> {
@@ -55,7 +56,7 @@ pub(crate) struct Parser<'src> {
     /// Map of literal IDs to string literals created by this parser.
     /// This is required as we need some access to a global list of string
     /// literals in order to determine the strings to store in `.data` later on.
-    str_lit_map: BiMap<LiteralId, String>,
+    str_lit_map: BiMap<StrLitId, String>,
 }
 
 impl<'src> Parser<'src> {
@@ -153,37 +154,8 @@ impl<'src> Parser<'src> {
         Ok(())
     }
 
-    /// Expects the next token to be a string literal, consumes it, and returns a parsed version
-    /// of the string contained within. If the token is not a string, returns a parser error.
-    pub fn consume_str(&mut self) -> Result<String> {
-        let lit_tok = self.consume(tok![str_literal])?;
-        let txt = self.text(lit_tok);
-
-        // Remove the trailing/leading quote marks.
-        let mut chars = txt.chars();
-        chars.next();
-        chars.next_back();
-        let txt = chars.as_str();
-
-        // Replace escape codes with their relevant real characters.
-        let mut txt = txt.replace("\\n", "\n");
-        txt = txt.replace("\\r", "\r");
-        txt = txt.replace("\\t", "\t");
-        Ok(txt)
-    }
-
-    /// Expects the next token to be a non-padded integer literal, consumes it, and returns a
-    /// parsed version of the integer contained within. Must fit within a [`usize`], otherwise
-    /// returns an error. Similarly errors on an invalid integer value.
-    pub fn consume_int(&mut self) -> Result<usize> {
-        let lit_tok = self.consume(tok![int_lit])?;
-        let txt = self.text(lit_tok);
-        txt.parse::<usize>()
-            .ctx(self, format!("Failed to parse integer literal: {}", txt))
-    }
-
     /// Inserts the given string literal into the literal table.
-    fn insert_literal(&mut self, val: String) -> LiteralId {
+    fn insert_literal(&mut self, val: String) -> StrLitId {
         if self.str_lit_map.contains_right(&val) {
             return *self.str_lit_map.get_by_right(&val).unwrap();
         }

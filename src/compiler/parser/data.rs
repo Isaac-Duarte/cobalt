@@ -1,6 +1,7 @@
-use miette::Result;
+use cranelift::codegen::ir::types;
+use miette::{Context, Result};
 
-use super::{err::GenericParseError, parser_bail, token::tok, Parser, ParserErrorContext};
+use super::{parser_bail, token::tok, Literal, Parser, ParserErrorContext};
 
 /// Working storage section of a COBOL data division.
 #[derive(Debug)]
@@ -33,6 +34,9 @@ pub(crate) struct ElementaryData<'src> {
 
     /// The PIC description of the variable.
     pub pic: Pic,
+
+    /// The initial value of this variable.
+    pub initial_val: Option<Literal>
 }
 
 impl<'src> Parser<'src> {
@@ -57,10 +61,36 @@ impl<'src> Parser<'src> {
         let pic_parser = PicParser::new(self, self.text(pic_tok));
         let pic = pic_parser.parse()?;
 
+        // For now, non-string values *must* be COMP.
+        if !pic.is_str() {
+            self.consume(tok![comp]).context("Defined values must be COMP.")?;
+        }
+
+        // Parse an initial value, if present.
+        let initial_val = if self.peek() == tok![value] {
+            self.next()?;
+            let lit = self.literal()?;
+
+            // Check the given literal fits the PIC layout.
+            if !pic.verify_val(&lit) {
+                parser_bail!(self, "Initial value for variable '{}' does not fit data layout.", name);
+            }
+
+            // todo: verify size bounds
+
+            Some(lit)
+        } else {
+            None
+        };
+
         // Data elements must end with a ".", EOL.
         self.consume_vec(&[tok![.], tok![eol]])?;
 
-        Ok(ElementaryData { name, pic })
+        Ok(ElementaryData {
+            name,
+            pic,
+            initial_val
+        })
     }
 }
 
@@ -71,7 +101,56 @@ pub(crate) struct Pic {
     pub layout_chunks: Vec<PicLayoutChunk>,
 
     /// The total length of this data layout, in bytes.
+    /// Only valid for uncompressed BCD non-comp variables or strings.
+    /// For other types of variable, instead reference [`Pic::comp_size()`].
     pub byte_len: usize,
+}
+
+impl Pic {
+    /// Returns the size of this data layout in COMP mode.
+    pub fn comp_size(&self) -> usize {
+        if self.is_str() {
+            return self.byte_len;
+        }
+        if self.is_float() {
+            return types::F64.bytes().try_into().unwrap();
+        }
+        return types::I32.bytes().try_into().unwrap();
+    }
+
+    /// Verifies that the given literal fits within the data layout.
+    pub fn verify_val(&self, lit: &Literal) -> bool {
+        match lit {
+            Literal::Float(_) => self.is_float(),
+            Literal::Int(_) => !self.is_str() && !self.is_float(),
+            Literal::String(_) => self.is_str()
+        }
+    }
+
+    /// Returns whether this data layout represents a string of some form, be that
+    /// alpha or alphanumeric.
+    pub fn is_str(&self) -> bool {
+        self.layout_chunks
+            .iter()
+            .filter(|c| {
+                c.chunk_type == PicChunkType::Alpha
+                    || c.chunk_type == PicChunkType::AlphaNumeric
+            })
+            .count()
+            > 0
+    }
+
+    /// Returns whether this data layout represents a float.
+    pub fn is_float(&self) -> bool {
+        self.layout_chunks
+            .iter()
+            .filter(|c| {
+                c.chunk_type == PicChunkType::DecimalPoint
+                    || c.chunk_type == PicChunkType::ImplicitDecimalPoint
+            })
+            .count()
+            > 0
+    }
 }
 
 /// Represents a single chunk within a PIC layout.
@@ -150,19 +229,29 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
 
         // Calculate the total byte length of the combined chunks.
         let mut byte_len = 0;
+        let mut contains_alpha = false;
         for chunk in (&self.chunks).iter() {
             match chunk.chunk_type {
                 PicChunkType::DecimalPoint
                 | PicChunkType::Numeric
-                | PicChunkType::Alpha
-                | PicChunkType::AlphaNumeric
                 | PicChunkType::Sign => {
+                    byte_len += chunk.len;
+                },
+
+                PicChunkType::Alpha
+                | PicChunkType::AlphaNumeric => {
+                    contains_alpha = true;
                     byte_len += chunk.len;
                 }
 
                 // These types are implicit, and don't add any length.
                 PicChunkType::ImplicitDecimalPoint => {}
             }
+        }
+
+        // If the layout is a string, then we need an extra byte for a terminator.
+        if contains_alpha {
+            byte_len += 1;
         }
 
         // Check the byte length is valid.
@@ -268,7 +357,10 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
         // Check for invalid combinations of chunks.
         if (&self.chunks)
             .iter()
-            .filter(|c| c.chunk_type == PicChunkType::Numeric)
+            .filter(|c| c.chunk_type == PicChunkType::Numeric
+                        || c.chunk_type == PicChunkType::Sign
+                        || c.chunk_type == PicChunkType::DecimalPoint
+                        || c.chunk_type == PicChunkType::ImplicitDecimalPoint)
             .count()
             > 0
             && (&self.chunks)

@@ -1,10 +1,10 @@
 use miette::Result;
-use super::{token::tok, LiteralId, Parser};
+use super::{token::tok, StrLitId, Parser};
 
 /// Represents a single executable statement within a COBOL program.
 #[derive(Debug)]
 pub(crate) enum Stat<'src> {
-    Display(LiteralId),
+    Display(StrLitId),
     _Placeholder(&'src str)
 }
 

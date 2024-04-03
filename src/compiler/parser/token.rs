@@ -11,10 +11,12 @@ macro_rules! tok {
     [ws_section] => { $crate::compiler::parser::Token::WsSection };
     [pic] => { $crate::compiler::parser::Token::Pic };
     [value] => { $crate::compiler::parser::Token::Value };
+    [comp] => { $crate::compiler::parser::Token::Comp };
     [program_id] => { $crate::compiler::parser::Token::ProgramId };
     [stop_run] => { $crate::compiler::parser::Token::StopRun };
     [display] => { $crate::compiler::parser::Token::Display };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
+    [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
     [int_lit] => { $crate::compiler::parser::Token::IntLiteral };
     [str_literal] => { $crate::compiler::parser::Token::StringLiteral };
     [pic_clause] => { $crate::compiler::parser::Token::PicClause };
@@ -90,6 +92,8 @@ pub(crate) enum Token {
     Pic,
     #[token("VALUE")]
     Value,
+    #[token("COMP")]
+    Comp,
     #[token("PROGRAM-ID")]
     ProgramId,
     #[token("STOP RUN")]
@@ -98,6 +102,8 @@ pub(crate) enum Token {
     Display,
     #[token(".")]
     CtrlDot,
+    #[regex(r#"(-)?[0-9]+\.[0-9]+"#)]
+    FloatLiteral,
     #[regex(r#"(-)?[0-9]+"#, priority = 5)]
     IntLiteral,
     #[regex(r#""((\[.])|[^\"])*""#)]
@@ -129,10 +135,12 @@ impl Display for Token {
             Token::WsSection => write!(f, "WORKING-STORAGE SECTION"),
             Token::Pic => write!(f, "PIC"),
             Token::Value => write!(f, "VALUE"),
+            Token::Comp => write!(f, "COMP"),
             Token::ProgramId => write!(f, "PROGRAM-ID"),
             Token::StopRun => write!(f, "STOP RUN"),
             Token::Display => write!(f, "DISPLAY"),
             Token::CtrlDot => write!(f, "."),
+            Token::FloatLiteral => write!(f, "float-literal"),
             Token::IntLiteral => write!(f, "int-literal"),
             Token::StringLiteral => write!(f, "string-literal"),
             Token::PicClause => write!(f, "pic-clause"),
