@@ -2,12 +2,20 @@
 use core::ffi::{c_char, CStr};
 use libc_print::std_name::print;
 
+/// This is a horrible hack.
+#[no_mangle]
+extern "C" fn rust_eh_personality() {}
+
+#[allow(non_snake_case)]
+#[no_mangle]
+extern "C" fn _Unwind_Resume() {}
+
 /// Panic handler for the intrinsics crate.
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     libc_print::std_name::eprintln!("Abort! :: {info}");
-    loop {}
+    unsafe { libc::abort() }
 }
 
 /// Prints a single string to `stdout` without appending a newline.

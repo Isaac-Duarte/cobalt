@@ -13,4 +13,5 @@ panic = "abort"
 panic = "abort"
 
 [dependencies]
+libc = "0.2.153"
 libc-print = "0.1.22"
