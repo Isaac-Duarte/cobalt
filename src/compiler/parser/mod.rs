@@ -5,7 +5,6 @@ use std::iter::Peekable;
 
 use self::token::{tok, Lexer, Token};
 use crate::compiler::parser::err::GenericParseError;
-use bimap::BiMap;
 use miette::{NamedSource, Result, SourceSpan};
 
 mod ast;
@@ -53,10 +52,10 @@ pub(crate) struct Parser<'src> {
     /// The current token the parser is pointed at.
     cur: Option<Spanned<Token>>,
 
-    /// Map of literal IDs to string literals created by this parser.
+    /// Store of string literals created by this parser.
     /// This is required as we need some access to a global list of string
-    /// literals in order to determine the strings to store in `.data` later on.
-    str_lit_map: BiMap<StrLitId, String>,
+    /// literals in order to determine the strings to store in `.rodata` later on.
+    str_lits: StrLitStore
 }
 
 impl<'src> Parser<'src> {
@@ -67,7 +66,7 @@ impl<'src> Parser<'src> {
             cu_name,
             tokens: Lexer::new(input).peekable(),
             cur: None,
-            str_lit_map: BiMap::new(),
+            str_lits: StrLitStore::new(),
         }
     }
 
@@ -152,16 +151,6 @@ impl<'src> Parser<'src> {
             self.consume(*tok)?;
         }
         Ok(())
-    }
-
-    /// Inserts the given string literal into the literal table.
-    fn insert_literal(&mut self, val: String) -> StrLitId {
-        if self.str_lit_map.contains_right(&val) {
-            return *self.str_lit_map.get_by_right(&val).unwrap();
-        }
-        let id = self.str_lit_map.len();
-        self.str_lit_map.insert(id, val);
-        id
     }
 
     //Returns the source code being parsed as a NamedSource.

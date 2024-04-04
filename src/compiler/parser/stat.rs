@@ -21,7 +21,7 @@ impl<'src> Parser<'src> {
     fn parse_display(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![display])?;
         let literal = self.consume_str()?;
-        let lit_id = self.insert_literal(literal);
+        let lit_id = self.str_lits.insert(literal);
         self.consume_vec(&[tok![.], tok![eol]])?;
 
         Ok(Stat::Display(lit_id))

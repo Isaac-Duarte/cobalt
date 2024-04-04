@@ -1,6 +1,5 @@
-use bimap::BiMap;
 use miette::Result;
-use super::{divs::{DataDiv, IdentDiv, ProcDiv}, token::Token, StrLitId, Parser};
+use super::{divs::{DataDiv, IdentDiv, ProcDiv}, token::Token, Parser, StrLitStore};
 
 /// Represents the overall AST of a COBOL program.
 #[derive(Debug)]
@@ -14,8 +13,8 @@ pub struct Ast<'src> {
     // The procedure division of the program.
     pub proc_div: ProcDiv<'src>,
 
-    // Map of string literals used throughout the AST.
-    pub str_lits: BiMap<StrLitId, String>
+    // Store of string literals used throughout the AST.
+    pub str_lits: StrLitStore
 }
 
 impl<'src> Parser<'src> {
@@ -33,7 +32,7 @@ impl<'src> Parser<'src> {
             ident_div,
             data_div,
             proc_div,
-            str_lits: self.str_lit_map
+            str_lits: self.str_lits
         })
     }
 }

@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
-use bimap::BiMap;
 use cranelift_module::{DataDescription, DataId, Module};
 use cranelift_object::ObjectModule;
 use miette::Result;
 
-use crate::compiler::parser::{Ast, DataDiv, Literal, Pic, StrLitId};
+use crate::compiler::parser::{Ast, DataDiv, Literal, Pic, StrLitId, StrLitStore};
 
 /**
  * Structures and utilities for configuring the static data layout
@@ -67,7 +66,7 @@ impl DataManager {
     fn upload_vars<'src>(
         &mut self,
         module: &mut ObjectModule,
-        str_lits: &BiMap<StrLitId, String>,
+        str_lits: &StrLitStore,
         data_div: &DataDiv<'src>,
     ) -> Result<()> {
         let mut desc = DataDescription::new();
@@ -103,7 +102,7 @@ impl DataManager {
     }
 
     /// Creates the initial byte value for a single COBOL variable.
-    fn create_init_val(&self, pic: &Pic, lit: &Literal, str_lits: &BiMap<StrLitId, String>) -> Vec<u8> {
+    fn create_init_val(&self, pic: &Pic, lit: &Literal, str_lits: &StrLitStore) -> Vec<u8> {
         match lit {
             Literal::Float(f) => {
                 f.to_ne_bytes().to_vec()
@@ -112,7 +111,7 @@ impl DataManager {
                 i.to_ne_bytes().to_vec()
             },
             Literal::String(id) => {
-                let str = str_lits.get_by_left(id).unwrap();
+                let str = str_lits.get(*id).unwrap();
                 let mut init_data = str.clone().into_bytes();
                 while init_data.len() < pic.comp_size() {
                     init_data.push(0x0);
@@ -127,10 +126,10 @@ impl DataManager {
     fn upload_str_lits(
         &mut self,
         module: &mut ObjectModule,
-        literals: &BiMap<StrLitId, String>,
+        str_lits: &StrLitStore,
     ) -> Result<()> {
         let mut desc = DataDescription::new();
-        for (lit_id, literal) in literals.iter() {
+        for (lit_id, literal) in str_lits.stored_lits().iter() {
             // Declare string literals as anonymous, unwriteable & non thread-local.
             let data_id = module
                 .declare_anonymous_data(false, false)

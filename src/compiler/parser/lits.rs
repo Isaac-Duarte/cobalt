@@ -1,9 +1,77 @@
+use bimap::BiMap;
 use miette::Result;
 
 use super::{parser_bail, token::{tok, Token}, Parser, ParserErrorContext};
 
 /// ID for a single string literal within the AST.
 pub type StrLitId = usize;
+
+/// Store for string literals referenced throughout the AST.
+/// Used to centralise string literal data for easy access during code generation.
+#[derive(Debug)]
+pub(crate) struct StrLitStore {
+    /// Map of all string literals which are stored in the output program's `.rodata`.
+    lit_map: BiMap<StrLitId, String>,
+
+    /// Map of all string literals which are present in the AST, but require no storage
+    /// in the output program's `.rodata` section.
+    transient_map: BiMap<StrLitId, String>,
+
+    /// The current ID counter.
+    /// This must be globally unique across both arrays, to avoid ID collisions.
+    cur_id: StrLitId
+}
+
+impl StrLitStore {
+    /// Creates a new string literal store.
+    pub fn new() -> Self {
+        Self {
+            lit_map: BiMap::new(),
+            transient_map: BiMap::new(),
+            cur_id: 0
+        }
+    }
+
+    /// Returns a reference to the list of stored string literals to be output to the
+    /// program's `.rodata` section.
+    pub fn stored_lits(&self) -> &BiMap<StrLitId, String> {
+        &self.lit_map
+    }
+
+    /// Inserts a new stored literal into the string literal store, returning an ID.
+    /// If the literal is already present, returns the existing ID.
+    pub fn insert(&mut self, val: String) -> StrLitId {
+        if self.lit_map.contains_right(&val) {
+            return *self.lit_map.get_by_right(&val).unwrap();
+        }
+        let id = self.cur_id;
+        self.lit_map.insert(id, val);
+        self.cur_id += 1;
+        id
+    }
+
+    /// Inserts a new transient (AST-only) literal into the string literal store, returning
+    /// an ID. If the literal is already present, returns the existing ID.
+    pub fn insert_transient(&mut self, val: String) -> StrLitId {
+        if self.transient_map.contains_right(&val) {
+            return *self.transient_map.get_by_right(&val).unwrap();
+        }
+        let id = self.cur_id;
+        self.transient_map.insert(id, val);
+        self.cur_id += 1;
+        id
+    }
+
+    /// Returns the stored string literal associated with the given ID.
+    pub fn get(&self, lit_id: StrLitId) -> Option<&String> {
+        match self.lit_map.get_by_left(&lit_id) {
+            Some(x) => Some(x),
+            None => {
+                self.transient_map.get_by_left(&lit_id)
+            }
+        }
+    }
+}
 
 /// A single generic literal within a COBOL AST.
 #[derive(Debug)]
@@ -15,11 +83,12 @@ pub(crate) enum Literal {
 
 impl<'src> Parser<'src> {
     /// Parses a single literal from the current position.
+    /// Assumes all string literals found are stored, not transient (AST-only).
     pub(super) fn literal(&mut self) -> Result<Literal> {
         match self.peek() {
             Token::StringLiteral => {
                 let text = self.consume_str()?;
-                let id = self.insert_literal(text);
+                let id = self.str_lits.insert(text);
                 Ok(Literal::String(id))
             },
             Token::IntLiteral => {

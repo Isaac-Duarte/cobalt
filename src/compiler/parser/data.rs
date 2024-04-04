@@ -1,7 +1,7 @@
 use cranelift::codegen::ir::types;
 use miette::{Context, Result};
 
-use super::{parser_bail, token::tok, Literal, Parser, ParserErrorContext};
+use super::{parser_bail, token::tok, Literal, Parser, ParserErrorContext, StrLitStore};
 
 /// Working storage section of a COBOL data division.
 #[derive(Debug)]
@@ -63,20 +63,29 @@ impl<'src> Parser<'src> {
 
         // For now, non-string values *must* be COMP.
         if !pic.is_str() {
-            self.consume(tok![comp]).context("Defined values must be COMP.")?;
+            self.consume(tok![comp]).context("Non-string variables must be COMP.")?;
         }
 
         // Parse an initial value, if present.
         let initial_val = if self.peek() == tok![value] {
             self.next()?;
-            let lit = self.literal()?;
 
-            // Check the given literal fits the PIC layout.
-            if !pic.verify_val(&lit) {
+            // For the data section specifically, we have to be a little careful:
+            // - String literals parsed here must not be stored in `.rodata` (since we're storing it elsewhere).
+            // - Using [`Self::literal()`] assumes that any strings found are stored in `.rodata`.
+            // Thus, here, we manually check for a string first before parsing out a literal.
+            let lit = if self.peek() == tok![str_literal] {
+                let txt = self.consume_str()?;
+                let lit_id = self.str_lits.insert_transient(txt);
+                Literal::String(lit_id)
+            } else {
+                self.literal()?
+            };
+
+            // Check the given literal fits the PIC layout. This also checks size bounds.
+            if !pic.verify_val(&self.str_lits, &lit) {
                 parser_bail!(self, "Initial value for variable '{}' does not fit data layout.", name);
             }
-
-            // todo: verify size bounds
 
             Some(lit)
         } else {
@@ -115,15 +124,15 @@ impl Pic {
         if self.is_float() {
             return types::F64.bytes().try_into().unwrap();
         }
-        return types::I32.bytes().try_into().unwrap();
+        return types::I64.bytes().try_into().unwrap();
     }
 
     /// Verifies that the given literal fits within the data layout.
-    pub fn verify_val(&self, lit: &Literal) -> bool {
+    pub fn verify_val(&self, lits: &StrLitStore, lit: &Literal) -> bool {
         match lit {
-            Literal::Float(_) => self.is_float(),
-            Literal::Int(_) => !self.is_str() && !self.is_float(),
-            Literal::String(_) => self.is_str()
+            Literal::Float(f) => self.is_float() && f.to_ne_bytes().len() <= self.comp_size(),
+            Literal::Int(i) => !self.is_str() && !self.is_float() && i.to_ne_bytes().len() <= self.comp_size(),
+            Literal::String(sid) => self.is_str() && lits.get(*sid).unwrap().len() < self.comp_size()
         }
     }
 
