@@ -1,5 +1,14 @@
+#![no_std]
 use core::ffi::{c_char, CStr};
 use libc_print::std_name::print;
+
+/// Panic handler for the intrinsics crate.
+#[cfg(not(test))]
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    libc_print::std_name::eprintln!("Abort! :: {info}");
+    loop {}
+}
 
 /// Prints a single string to `stdout` without appending a newline.
 #[no_mangle]

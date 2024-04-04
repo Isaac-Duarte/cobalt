@@ -1,0 +1,12 @@
+{
+    "inlayHints": {
+        "typeHints": false,
+        "parameterHints": false
+    },
+    "rust-analyzer.inlayHints.chainingHints.enable": false,
+    "rust-analyzer.inlayHints.typeHints.enable": false,
+    "rust-analyzer.linkedProjects": [
+        "crates/compiler/Cargo.toml",
+        "crates/intrinsics/Cargo.toml"
+    ]
+}

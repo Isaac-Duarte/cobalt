@@ -1,7 +1,11 @@
 /target
 
-# Editor artifacts.
-.vscode/
+# Cargo (Rust) artifacts.
+crates/compiler/target
+crates/intrinsics/target
 
-# Output artifacts.
+# Build artifacts.
+/build
+
+# Cobalt output artifacts.
 /out
