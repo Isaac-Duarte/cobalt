@@ -11,6 +11,7 @@ mod ast;
 mod data;
 mod divs;
 mod err;
+mod expr;
 mod lits;
 mod stat;
 mod token;
@@ -31,8 +32,9 @@ pub(crate) use parser_bail;
 pub use ast::Ast;
 pub(crate) use data::*;
 pub(crate) use divs::*;
+pub(crate) use expr::*;
 pub(crate) use lits::*;
-pub(crate) use stat::Stat;
+pub(crate) use stat::*;
 
 /// Simple span types for use in AST items throughout the parser.
 pub type Span = SourceSpan;
@@ -55,7 +57,7 @@ pub(crate) struct Parser<'src> {
     /// Store of string literals created by this parser.
     /// This is required as we need some access to a global list of string
     /// literals in order to determine the strings to store in `.rodata` later on.
-    str_lits: StrLitStore
+    str_lits: StrLitStore,
 }
 
 impl<'src> Parser<'src> {

@@ -81,6 +81,17 @@ pub(crate) enum Literal {
     Float(f64)   
 }
 
+impl Literal {
+    /// Extracts a text version of this literal, for display to users.
+    pub fn text(&self, str_lits: &StrLitStore) -> String {
+        match self {
+            Self::String(sid) => str_lits.get(*sid).unwrap().clone(),
+            Self::Int(i) => i.to_string(),
+            Self::Float(f) => f.to_string()
+        }
+    }
+}
+
 impl<'src> Parser<'src> {
     /// Parses a single literal from the current position.
     /// Assumes all string literals found are stored, not transient (AST-only).

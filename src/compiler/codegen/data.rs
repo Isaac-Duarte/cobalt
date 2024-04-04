@@ -47,18 +47,30 @@ impl DataManager {
     }
 
     /// Returns the Cranelift [`DataId`] associated with the given COBOL symbol.
-    pub(super) fn sym_data_id<'a>(&self, sym: &'a str) -> Option<DataId> {
-        self.sym_map.get(sym).map(|o| o.0)
+    pub(super) fn sym_data_id<'a>(&self, sym: &'a str) -> Result<DataId> {
+        self.sym_map
+            .get(sym)
+            .map(|o| o.0)
+            .ok_or(miette::diagnostic!("No declared variable named '{}'.", sym).into())
     }
 
     /// Returns the [`Pic`] layout associated with the given COBOL symbol.
-    pub(super) fn sym_pic<'a>(&self, sym: &'a str) -> Option<&Pic> {
-        self.sym_map.get(sym).map(|o| &o.1)
+    pub(super) fn sym_pic<'a>(&self, sym: &'a str) -> Result<&Pic> {
+        self.sym_map
+            .get(sym)
+            .map(|o| &o.1)
+            .ok_or(miette::diagnostic!("Failed to fetch data slot for variable '{}'.", sym).into())
     }
 
     /// Returns the Cranelift [`DataId`] associated with the given [`LiteralId`].
-    pub(super) fn str_data_id(&self, lit_id: StrLitId) -> Option<DataId> {
-        self.str_lit_map.get(&lit_id).map(|o| *o)
+    pub(super) fn str_data_id(&self, lit_id: StrLitId) -> Result<DataId> {
+        self.str_lit_map.get(&lit_id).map(|o| *o).ok_or(
+            miette::diagnostic!(
+                "Failed to fetch data slot for literal string ID '{}'.",
+                lit_id
+            )
+            .into(),
+        )
     }
 
     /// Uploads variables present in the data division to the object file, registering them
@@ -74,7 +86,13 @@ impl DataManager {
             // Declare symbol data within module.
             let data_id = module
                 .declare_data(elem_var.name, cranelift_module::Linkage::Local, true, false)
-                .map_err(|err| miette::diagnostic!("Failed to declare data for symbol '{}': {}", elem_var.name, err))?;
+                .map_err(|err| {
+                    miette::diagnostic!(
+                        "Failed to declare data for symbol '{}': {}",
+                        elem_var.name,
+                        err
+                    )
+                })?;
             desc.clear();
 
             // Declare the data description of the variable.
@@ -82,7 +100,7 @@ impl DataManager {
                 Some(init_val) => {
                     let init_data = self.create_init_val(&elem_var.pic, init_val, str_lits);
                     desc.define(init_data.into_boxed_slice());
-                },
+                }
                 None => {
                     // No initial value, so declare as zeroed out.
                     desc.define_zeroinit(elem_var.pic.comp_size());
@@ -91,25 +109,26 @@ impl DataManager {
 
             // Define the data within the object.
             module.define_data(data_id, &desc).map_err(|err| {
-                miette::diagnostic!("Failed to define data for symbol '{}': {}", elem_var.name, err)
+                miette::diagnostic!(
+                    "Failed to define data for symbol '{}': {}",
+                    elem_var.name,
+                    err
+                )
             })?;
 
             // Register this symbol in the symbol map.
-            self.sym_map.insert(elem_var.name.into(), (data_id, elem_var.pic.clone()));
+            self.sym_map
+                .insert(elem_var.name.into(), (data_id, elem_var.pic.clone()));
         }
-        
+
         Ok(())
     }
 
     /// Creates the initial byte value for a single COBOL variable.
     fn create_init_val(&self, pic: &Pic, lit: &Literal, str_lits: &StrLitStore) -> Vec<u8> {
         match lit {
-            Literal::Float(f) => {
-                f.to_ne_bytes().to_vec()
-            },
-            Literal::Int(i) => {
-                i.to_ne_bytes().to_vec()
-            },
+            Literal::Float(f) => f.to_ne_bytes().to_vec(),
+            Literal::Int(i) => i.to_ne_bytes().to_vec(),
             Literal::String(id) => {
                 let str = str_lits.get(*id).unwrap();
                 let mut init_data = str.clone().into_bytes();
@@ -123,11 +142,7 @@ impl DataManager {
 
     /// Uploads the set of string literals used within the program to the object file.
     /// Registers all string literals within the object manager as offsets in a data block.
-    fn upload_str_lits(
-        &mut self,
-        module: &mut ObjectModule,
-        str_lits: &StrLitStore,
-    ) -> Result<()> {
+    fn upload_str_lits(&mut self, module: &mut ObjectModule, str_lits: &StrLitStore) -> Result<()> {
         let mut desc = DataDescription::new();
         for (lit_id, literal) in str_lits.stored_lits().iter() {
             // Declare string literals as anonymous, unwriteable & non thread-local.

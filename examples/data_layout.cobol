@@ -8,6 +8,8 @@ DATA DIVISION.
     01 HELLO-WORLD PIC X(11) VALUE "Hello World".
 
 PROCEDURE DIVISION.
-    DISPLAY "Hello world!\n".
-    DISPLAY "Is this thing on?\n".
+    DISPLAY "Hello world!".
+    MOVE SOME-IDENT TO SOME-OTHER-IDENT.
+    MOVE 10 TO SOME-IDENT.
+    MOVE "Another Str" TO HELLO-WORLD.
 STOP RUN.

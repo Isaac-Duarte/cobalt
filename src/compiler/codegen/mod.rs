@@ -88,12 +88,17 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
         self.data_manager.upload(&mut self.module, &ast)?;
 
         // Translate all functions.
-        self.translate_fn("main", &ast.proc_div.stats)?;
+        self.translate_fn("main", &ast, &ast.proc_div.stats)?;
         Ok(())
     }
 
     /// Generates a single function from the AST, given a name & list of statements.
-    fn translate_fn(&mut self, name: &str, stats: &Vec<Spanned<Stat<'src>>>) -> Result<()> {
+    fn translate_fn(
+        &mut self,
+        name: &str,
+        ast: &Ast<'src>,
+        stats: &Vec<Spanned<Stat<'src>>>,
+    ) -> Result<()> {
         // Create "main" function for later linking.
         // Returns int, has no parameters.
         let int = self.module.target_config().pointer_type();
@@ -126,6 +131,7 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
             let mut trans = FuncTranslator {
                 builder,
                 module: &mut self.module,
+                ast,
                 intrinsics: &mut self.intrinsics,
                 data: &mut self.data_manager,
             };

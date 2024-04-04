@@ -1,5 +1,5 @@
-use miette::Result;
 use super::{data::WorkingStorageSec, stat::Stat, token::tok, Parser, Spanned};
+use miette::Result;
 
 ////////////////////
 // IDENT DIVISION //
@@ -9,7 +9,7 @@ use super::{data::WorkingStorageSec, stat::Stat, token::tok, Parser, Spanned};
 #[derive(Debug)]
 pub(crate) struct IdentDiv<'src> {
     /// The ID slug of the program.
-    pub program_id: &'src str
+    pub program_id: &'src str,
 }
 
 impl<'src> Parser<'src> {
@@ -24,9 +24,7 @@ impl<'src> Parser<'src> {
         let program_id = self.text(prog_id_tok);
         self.consume_vec(&[tok![.], tok![eol]])?;
 
-        Ok(IdentDiv {
-            program_id
-        })
+        Ok(IdentDiv { program_id })
     }
 }
 
@@ -38,17 +36,17 @@ impl<'src> Parser<'src> {
 #[derive(Debug)]
 pub(crate) struct ProcDiv<'src> {
     /// Statements within the procedure division.
-    pub stats: Vec<Spanned<Stat<'src>>>
+    pub stats: Vec<Spanned<Stat<'src>>>,
 }
 
 impl<'src> Parser<'src> {
-     /// Parses a procedure division from COBOL tokens.
-     pub(super) fn proc_div(&mut self) -> Result<ProcDiv<'src>> {
+    /// Parses a procedure division from COBOL tokens.
+    pub(super) fn proc_div(&mut self) -> Result<ProcDiv<'src>> {
         // Parse header.
         self.consume_vec(&[tok![proc_div], tok![.], tok![eol]])?;
 
         // Parse statements until we peek a "STOP RUN".
-        let mut stats: Vec<Spanned<Stat<'src>>> = Vec::new();
+        let mut stats: Vec<Spanned<Stat>> = Vec::new();
         while self.peek() != tok![stop_run] {
             let start_idx = self.peek_idx();
             let stat = self.stat()?;
@@ -64,9 +62,7 @@ impl<'src> Parser<'src> {
         }
         self.consume(tok![eof])?;
 
-        Ok(ProcDiv {
-            stats
-        })
+        Ok(ProcDiv { stats })
     }
 }
 
@@ -90,8 +86,6 @@ impl<'src> Parser<'src> {
         // Working storage section.
         let ws_section = self.ws_section()?;
 
-        Ok(DataDiv {
-            ws_section
-        })
-   }
+        Ok(DataDiv { ws_section })
+    }
 }

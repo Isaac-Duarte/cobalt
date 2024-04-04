@@ -36,7 +36,7 @@ pub(crate) struct ElementaryData<'src> {
     pub pic: Pic,
 
     /// The initial value of this variable.
-    pub initial_val: Option<Literal>
+    pub initial_val: Option<Literal>,
 }
 
 impl<'src> Parser<'src> {
@@ -63,7 +63,8 @@ impl<'src> Parser<'src> {
 
         // For now, non-string values *must* be COMP.
         if !pic.is_str() {
-            self.consume(tok![comp]).context("Non-string variables must be COMP.")?;
+            self.consume(tok![comp])
+                .context("Non-string variables must be COMP.")?;
         }
 
         // Parse an initial value, if present.
@@ -83,8 +84,12 @@ impl<'src> Parser<'src> {
             };
 
             // Check the given literal fits the PIC layout. This also checks size bounds.
-            if !pic.verify_val(&self.str_lits, &lit) {
-                parser_bail!(self, "Initial value for variable '{}' does not fit data layout.", name);
+            if !pic.verify_lit(&self.str_lits, &lit) {
+                parser_bail!(
+                    self,
+                    "Initial value for variable '{}' does not fit data layout.",
+                    name
+                );
             }
 
             Some(lit)
@@ -98,7 +103,7 @@ impl<'src> Parser<'src> {
         Ok(ElementaryData {
             name,
             pic,
-            initial_val
+            initial_val,
         })
     }
 }
@@ -128,12 +133,28 @@ impl Pic {
     }
 
     /// Verifies that the given literal fits within the data layout.
-    pub fn verify_val(&self, lits: &StrLitStore, lit: &Literal) -> bool {
+    pub fn verify_lit(&self, lits: &StrLitStore, lit: &Literal) -> bool {
         match lit {
             Literal::Float(f) => self.is_float() && f.to_ne_bytes().len() <= self.comp_size(),
-            Literal::Int(i) => !self.is_str() && !self.is_float() && i.to_ne_bytes().len() <= self.comp_size(),
-            Literal::String(sid) => self.is_str() && lits.get(*sid).unwrap().len() < self.comp_size()
+            Literal::Int(i) => {
+                !self.is_str() && !self.is_float() && i.to_ne_bytes().len() <= self.comp_size()
+            }
+            Literal::String(sid) => {
+                self.is_str() && lits.get(*sid).unwrap().len() < self.comp_size()
+            }
         }
+    }
+
+    /// Whether this PIC layout would fit within the provided PIC layout.
+    /// Utilises the [`Self::comp_size()`] result to perform size checks.
+    pub fn fits_within_comp(&self, other: &Pic) -> bool {
+        // Check the base types match.
+        if self.is_str() && !other.is_str() || self.is_float() && !other.is_float() {
+            return false;
+        }
+
+        // Compare sizes.
+        self.comp_size() <= other.comp_size()
     }
 
     /// Returns whether this data layout represents a string of some form, be that
@@ -142,8 +163,7 @@ impl Pic {
         self.layout_chunks
             .iter()
             .filter(|c| {
-                c.chunk_type == PicChunkType::Alpha
-                    || c.chunk_type == PicChunkType::AlphaNumeric
+                c.chunk_type == PicChunkType::Alpha || c.chunk_type == PicChunkType::AlphaNumeric
             })
             .count()
             > 0
@@ -241,14 +261,11 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
         let mut contains_alpha = false;
         for chunk in (&self.chunks).iter() {
             match chunk.chunk_type {
-                PicChunkType::DecimalPoint
-                | PicChunkType::Numeric
-                | PicChunkType::Sign => {
+                PicChunkType::DecimalPoint | PicChunkType::Numeric | PicChunkType::Sign => {
                     byte_len += chunk.len;
-                },
+                }
 
-                PicChunkType::Alpha
-                | PicChunkType::AlphaNumeric => {
+                PicChunkType::Alpha | PicChunkType::AlphaNumeric => {
                     contains_alpha = true;
                     byte_len += chunk.len;
                 }
@@ -366,10 +383,12 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
         // Check for invalid combinations of chunks.
         if (&self.chunks)
             .iter()
-            .filter(|c| c.chunk_type == PicChunkType::Numeric
-                        || c.chunk_type == PicChunkType::Sign
-                        || c.chunk_type == PicChunkType::DecimalPoint
-                        || c.chunk_type == PicChunkType::ImplicitDecimalPoint)
+            .filter(|c| {
+                c.chunk_type == PicChunkType::Numeric
+                    || c.chunk_type == PicChunkType::Sign
+                    || c.chunk_type == PicChunkType::DecimalPoint
+                    || c.chunk_type == PicChunkType::ImplicitDecimalPoint
+            })
             .count()
             > 0
             && (&self.chunks)

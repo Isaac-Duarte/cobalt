@@ -15,6 +15,8 @@ macro_rules! tok {
     [program_id] => { $crate::compiler::parser::Token::ProgramId };
     [stop_run] => { $crate::compiler::parser::Token::StopRun };
     [display] => { $crate::compiler::parser::Token::Display };
+    [move] => { $crate::compiler::parser::Token::Move };
+    [to] => { $crate::compiler::parser::Token::To };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
     [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
     [int_lit] => { $crate::compiler::parser::Token::IntLiteral };
@@ -30,7 +32,7 @@ pub(crate) use tok;
 pub(crate) struct Lexer<'src> {
     input: &'src str,
     generated: logos::SpannedIter<'src, Token>,
-    eof_reached: bool
+    eof_reached: bool,
 }
 
 impl<'src> Lexer<'src> {
@@ -38,7 +40,7 @@ impl<'src> Lexer<'src> {
         Self {
             input,
             generated: Token::lexer(input).spanned(),
-            eof_reached: false
+            eof_reached: false,
         }
     }
 }
@@ -100,6 +102,10 @@ pub(crate) enum Token {
     StopRun,
     #[token("DISPLAY")]
     Display,
+    #[token("MOVE")]
+    Move,
+    #[token("TO", priority = 5)]
+    To,
     #[token(".")]
     CtrlDot,
     #[regex(r#"(-)?[0-9]+\.[0-9]+"#)]
@@ -139,6 +145,8 @@ impl Display for Token {
             Token::ProgramId => write!(f, "PROGRAM-ID"),
             Token::StopRun => write!(f, "STOP RUN"),
             Token::Display => write!(f, "DISPLAY"),
+            Token::Move => write!(f, "MOVE"),
+            Token::To => write!(f, "TO"),
             Token::CtrlDot => write!(f, "."),
             Token::FloatLiteral => write!(f, "float-literal"),
             Token::IntLiteral => write!(f, "int-literal"),
@@ -148,7 +156,7 @@ impl Display for Token {
             Token::EOL => write!(f, "EOL"),
             Token::EOF => write!(f, "EOF"),
             Token::Invalid => write!(f, "(unknown)"),
-            Token::SingleLineComment | Token::Ignored => unreachable!()
+            Token::SingleLineComment | Token::Ignored => unreachable!(),
         }
     }
 }
