@@ -59,14 +59,20 @@ impl<'src> FuncTranslator<'src> {
             .module
             .declare_data_in_func(self.data.str_data_id(lit_id)?, self.builder.func);
 
-        // Call "puts" on the string.
-        let puts =
+        // Call intrinsic to print the string.
+        let print_str =
             self.intrinsics
-                .get_ref(self.module, self.builder.func, CobaltIntrinsic::LibcPuts)?;
+                .get_ref(self.module, self.builder.func, CobaltIntrinsic::PrintStr)?;
         let ptr_type = self.module.target_config().pointer_type();
         let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
-        self.builder.ins().call(*puts, &[string_ptr]);
+        self.builder.ins().call(*print_str, &[string_ptr]);
 
+        // Call "putc" and insert a newline.
+        let putc =
+            self.intrinsics
+                .get_ref(self.module, self.builder.func, CobaltIntrinsic::LibcPutc)?;
+        let newline = self.builder.ins().iconst(types::I8, ('\n' as u8) as i64);
+        self.builder.ins().call(*putc, &[newline]);
         Ok(())
     }
 

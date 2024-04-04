@@ -19,9 +19,12 @@ pub(super) struct IntrinsicManager {
 }
 
 /// A comprehensive list of all available intrinsics in Cobalt.
+/// Those prepended with "Libc" are from the libc dependency.
+/// All others have sources within the [`cobalt_intrinsics`] crate.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum CobaltIntrinsic {
-    LibcPuts, // int puts(char*)
+    LibcPutc, // int putc(char)
+    PrintStr, // void print_str(char*)
 }
 
 impl IntrinsicManager {
@@ -65,11 +68,14 @@ impl IntrinsicManager {
         assert!(!self.funcs.contains_key(&i));
 
         // Get the function signature, name.
-        let sig = match i {
-            CobaltIntrinsic::LibcPuts => libcputs_sig(module)
+        let mut sig = module.make_signature();
+        match i {
+            CobaltIntrinsic::LibcPutc => libcputc_sig(&mut sig),
+            CobaltIntrinsic::PrintStr => printstr_sig(&mut sig, module)
         };
         let name = match i {
-            CobaltIntrinsic::LibcPuts => "puts"
+            CobaltIntrinsic::LibcPutc => "putc",
+            CobaltIntrinsic::PrintStr => "cb_print_str"
         };
 
         // Import it.
@@ -83,11 +89,14 @@ impl IntrinsicManager {
     }
 }
 
-/// Generates a function signature for [`CobaltIntrinsic::LibcPuts`].
-fn libcputs_sig(module: &mut ObjectModule) -> Signature {
-    let ptr_type = module.target_config().pointer_type();
-    let mut sig = module.make_signature();
-    sig.params.push(AbiParam::new(ptr_type));
+/// Generates a function signature for [`CobaltIntrinsic::LibcPutc`].
+fn libcputc_sig(sig: &mut Signature) {
+    sig.params.push(AbiParam::new(types::I8));
     sig.returns.push(AbiParam::new(types::I32));
-    sig
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::PrintStr`].
+fn printstr_sig(sig: &mut Signature, module: &mut ObjectModule) {
+    let ptr_type = module.target_config().pointer_type();
+    sig.params.push(AbiParam::new(ptr_type));
 }

@@ -58,6 +58,14 @@ impl<'cfg> Linker<'cfg> {
 
         // Dynamically linked libraries.
         ld.arg("-lc"); // libc
+        ld.arg("-lcobalt_intrinsics"); // libcobalt_intrinsics
+
+        // Add library search path for `cobalt_intrinsics`.
+        let mut cur_dir = std::env::current_exe().map_err(|err| {
+            miette::diagnostic!("Failed to find path of current executable: {}", err)
+        })?;
+        cur_dir.pop();
+        ld.arg(format!("-L{}", cur_dir.to_str().unwrap()));
 
         // Additional library search paths.
         for lib_path in self.platform_config.lib_paths() {
