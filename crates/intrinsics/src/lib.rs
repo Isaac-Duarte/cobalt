@@ -3,9 +3,15 @@ use core::ffi::{c_char, CStr};
 use libc_print::std_name::print;
 
 /// This is a horrible hack.
+/// Currently, `rustc` is buggy, and includes an external reference to the `eh_personality`
+/// lang item, even when the crate exclusively uses panic=abort. This is the only solid workaround
+/// that I could find so far, however it's quite fragile.
+/// See: https://github.com/rust-lang/rust/issues/106864#issuecomment-1858861750
 #[no_mangle]
 extern "C" fn rust_eh_personality() {}
 
+/// Ditto to above.
+/// See: https://github.com/rust-lang/rust/issues/106864#issuecomment-1858861750
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "C" fn _Unwind_Resume() {}

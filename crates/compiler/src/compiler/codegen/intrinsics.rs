@@ -23,7 +23,7 @@ pub(super) struct IntrinsicManager {
 /// All others have sources within the [`cobalt_intrinsics`] crate.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum CobaltIntrinsic {
-    LibcPutc, // int putc(char)
+    LibcPutchar, // int putc(char)
     PrintStr, // void print_str(char*)
 }
 
@@ -70,11 +70,11 @@ impl IntrinsicManager {
         // Get the function signature, name.
         let mut sig = module.make_signature();
         match i {
-            CobaltIntrinsic::LibcPutc => libcputc_sig(&mut sig),
+            CobaltIntrinsic::LibcPutchar => libcputchar_sig(&mut sig),
             CobaltIntrinsic::PrintStr => printstr_sig(&mut sig, module)
         };
         let name = match i {
-            CobaltIntrinsic::LibcPutc => "putc",
+            CobaltIntrinsic::LibcPutchar => "putchar",
             CobaltIntrinsic::PrintStr => "cb_print_str"
         };
 
@@ -89,8 +89,8 @@ impl IntrinsicManager {
     }
 }
 
-/// Generates a function signature for [`CobaltIntrinsic::LibcPutc`].
-fn libcputc_sig(sig: &mut Signature) {
+/// Generates a function signature for [`CobaltIntrinsic::LibcPutchar`].
+fn libcputchar_sig(sig: &mut Signature) {
     sig.params.push(AbiParam::new(types::I8));
     sig.returns.push(AbiParam::new(types::I32));
 }

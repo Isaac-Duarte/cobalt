@@ -67,12 +67,12 @@ impl<'src> FuncTranslator<'src> {
         let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
         self.builder.ins().call(*print_str, &[string_ptr]);
 
-        // Call "putc" and insert a newline.
-        // let putc =
-        //     self.intrinsics
-        //         .get_ref(self.module, self.builder.func, CobaltIntrinsic::LibcPutc)?;
-        // let newline = self.builder.ins().iconst(types::I8, ('\n' as u8) as i64);
-        // self.builder.ins().call(*putc, &[newline]);
+        // Call "putchar" and insert a newline.
+        let putchar =
+            self.intrinsics
+                .get_ref(self.module, self.builder.func, CobaltIntrinsic::LibcPutchar)?;
+        let newline = self.builder.ins().iconst(types::I8, ('\n' as u8) as i64);
+        self.builder.ins().call(*putchar, &[newline]);
         Ok(())
     }
 
