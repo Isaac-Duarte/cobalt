@@ -29,7 +29,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 pub unsafe extern "C" fn cb_print_str(c_buf: *const c_char) {
     let c_str: &CStr = unsafe { CStr::from_ptr(c_buf) };
     let str_slice: &str = c_str.to_str().unwrap();
-    print!("intrinsic test: '{str_slice}'");
+    print!("{str_slice}");
 }
 
 /// Prints a single [`i64`] to `stdout` without appending a newline.

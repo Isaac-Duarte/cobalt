@@ -15,8 +15,10 @@ macro_rules! tok {
     [program_id] => { $crate::compiler::parser::Token::ProgramId };
     [stop_run] => { $crate::compiler::parser::Token::StopRun };
     [display] => { $crate::compiler::parser::Token::Display };
+    [add] => { $crate::compiler::parser::Token::Add };
     [move] => { $crate::compiler::parser::Token::Move };
     [to] => { $crate::compiler::parser::Token::To };
+    [giving] => { $crate::compiler::parser::Token::Giving };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
     [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
     [int_lit] => { $crate::compiler::parser::Token::IntLiteral };
@@ -102,10 +104,14 @@ pub(crate) enum Token {
     StopRun,
     #[token("DISPLAY")]
     Display,
+    #[token("ADD")]
+    Add,
     #[token("MOVE")]
     Move,
     #[token("TO", priority = 5)]
     To,
+    #[token("GIVING")]
+    Giving,
     #[token(".")]
     CtrlDot,
     #[regex(r#"(-)?[0-9]+\.[0-9]+"#)]
@@ -145,8 +151,10 @@ impl Display for Token {
             Token::ProgramId => write!(f, "PROGRAM-ID"),
             Token::StopRun => write!(f, "STOP RUN"),
             Token::Display => write!(f, "DISPLAY"),
+            Token::Add => write!(f, "ADD"),
             Token::Move => write!(f, "MOVE"),
             Token::To => write!(f, "TO"),
+            Token::Giving => write!(f, "GIVING"),
             Token::CtrlDot => write!(f, "."),
             Token::FloatLiteral => write!(f, "float-literal"),
             Token::IntLiteral => write!(f, "int-literal"),

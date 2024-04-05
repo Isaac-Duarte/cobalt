@@ -1,83 +1,14 @@
-use crate::compiler::parser::{self, Ast, Literal, MoveData, Spanned, Stat};
-use cranelift::{
-    codegen::ir::{immediates::Offset32, types, InstBuilder, MemFlags},
-    frontend::FunctionBuilder,
-};
-use cranelift_module::Module;
-use cranelift_object::ObjectModule;
+use cranelift::{codegen::ir::immediates::Offset32, prelude::*};
+use cranelift_module::{DataId, Module};
 use miette::Result;
 
-use super::{
-    data::DataManager,
-    intrinsics::{CobaltIntrinsic, IntrinsicManager},
-};
+use crate::compiler::parser::{self, Literal, MoveData};
 
-/// Structure for translating function-level AST nodes to Cranelift IR.
-pub(super) struct FuncTranslator<'src> {
-    /// The function builder to use when translating the function.
-    pub builder: FunctionBuilder<'src>,
-
-    /// The module this function is a part of.
-    pub module: &'src mut ObjectModule,
-
-    /// The overall AST being translated.
-    pub ast: &'src Ast<'src>,
-
-    /// The intrinsics manager for this function.
-    pub intrinsics: &'src mut IntrinsicManager,
-
-    /// The data manager for this function.
-    pub data: &'src mut DataManager,
-}
+use super::FuncTranslator;
 
 impl<'src> FuncTranslator<'src> {
-    /// Generates Cranelift IR for a single statement from the given set of statements.
-    pub fn translate(&mut self, stats: &Vec<Spanned<Stat<'src>>>) -> Result<()> {
-        // Reset the intrinsics manager, since we're beginning a new function.
-        self.intrinsics.clear_refs();
-
-        // Translate all statements within the function.
-        for stat in stats {
-            self.translate_stat(stat)?;
-        }
-        Ok(())
-    }
-
-    /// Generates Cranelift IR for a single statement from the given set of statements.
-    fn translate_stat(&mut self, stat: &Spanned<Stat<'src>>) -> Result<()> {
-        match &stat.0 {
-            Stat::Display(lit_id) => self.translate_display(*lit_id)?,
-            Stat::Move(mov_data) => self.translate_move(mov_data)?,
-        }
-        Ok(())
-    }
-
-    /// Generates Cranelift IR for a single "DISPLAY" statement.
-    fn translate_display(&mut self, lit_id: usize) -> Result<()> {
-        // Declare a reference to the string for this display.
-        let string_gv = self
-            .module
-            .declare_data_in_func(self.data.str_data_id(lit_id)?, self.builder.func);
-
-        // Call intrinsic to print the string.
-        let print_str =
-            self.intrinsics
-                .get_ref(self.module, self.builder.func, CobaltIntrinsic::PrintStr)?;
-        let ptr_type = self.module.target_config().pointer_type();
-        let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
-        self.builder.ins().call(*print_str, &[string_ptr]);
-
-        // Call "putchar" and insert a newline.
-        let putchar =
-            self.intrinsics
-                .get_ref(self.module, self.builder.func, CobaltIntrinsic::LibcPutchar)?;
-        let newline = self.builder.ins().iconst(types::I8, ('\n' as u8) as i64);
-        self.builder.ins().call(*putchar, &[newline]);
-        Ok(())
-    }
-
     /// Generates Cranelift IR for a single "MOVE" statement.
-    fn translate_move(&mut self, mov_data: &MoveData) -> Result<()> {
+    pub(super) fn translate_move(&mut self, mov_data: &MoveData) -> Result<()> {
         // Fetch the destination variable's layout.
         let dest_pic = self.data.sym_pic(mov_data.dest)?;
 
@@ -87,11 +18,11 @@ impl<'src> FuncTranslator<'src> {
             parser::Value::Literal(lit) => {
                 if !dest_pic.verify_lit(&self.ast.str_lits, lit) {
                     miette::bail!(
-                        "Attempted to move incompatible literal '{}' into variable '{}' ({} bytes).",
-                        lit.text(&self.ast.str_lits),
-                        mov_data.dest,
-                        dest_pic.comp_size()
-                    );
+                    "Attempted to move incompatible literal '{}' into variable '{}' ({} bytes).",
+                    lit.text(&self.ast.str_lits),
+                    mov_data.dest,
+                    dest_pic.comp_size()
+                );
                 }
                 self.translate_mov_lit(lit, mov_data.dest)?;
             }
@@ -99,7 +30,7 @@ impl<'src> FuncTranslator<'src> {
                 let source_pic = self.data.sym_pic(sym)?;
                 if !source_pic.fits_within_comp(dest_pic) {
                     miette::bail!("Attempted to move incompatible variable '{}' ({} bytes) into variable '{}' ({} bytes).",
-                        sym, source_pic.comp_size(), mov_data.dest, dest_pic.comp_size());
+                    sym, source_pic.comp_size(), mov_data.dest, dest_pic.comp_size());
                 }
                 self.translate_mov_var(sym, mov_data.dest)?;
             }
@@ -109,7 +40,7 @@ impl<'src> FuncTranslator<'src> {
 
     /// Moves the given literal into the provided global data slot.
     /// Assumes that the literal has already been checked for compatibility with this data slot.
-    fn translate_mov_lit(&mut self, lit: &Literal, dest: &str) -> Result<()> {
+    pub(super) fn translate_mov_lit(&mut self, lit: &Literal, dest: &str) -> Result<()> {
         let dest_id = self.data.sym_data_id(dest)?;
         let dest_pic = self.data.sym_pic(dest)?;
 
@@ -213,5 +144,52 @@ impl<'src> FuncTranslator<'src> {
                 .store(MemFlags::new(), temp, dest_ptr, Offset32::new(0));
         }
         Ok(())
+    }
+
+    /// Loads the given [`parser::Value`] into the function as a Cranelift [`Value`].
+    /// If the value is a string, loads a pointer to the string. Immediates are loaded with iconst.
+    pub(super) fn load_value(&mut self, val: &parser::Value<'src>) -> Result<Value> {
+        match val {
+            parser::Value::Variable(sym) => self.load_var(sym),
+            parser::Value::Literal(lit) => self.load_lit(lit),
+        }
+    }
+
+    /// Loads the given variable into the function as a Cranelift [`Value`].
+    /// If the variable is a string, loads a pointer to the string.
+    pub(super) fn load_var(&mut self, sym: &'src str) -> Result<Value> {
+        let ptr = self.load_ptr(self.data.sym_data_id(sym)?);
+        let pic = self.data.sym_pic(sym)?;
+        if pic.is_str() {
+            Ok(ptr)
+        } else if pic.is_float() {
+            Ok(self
+                .builder
+                .ins()
+                .load(types::F64, MemFlags::new(), ptr, Offset32::new(0)))
+        } else {
+            Ok(self
+                .builder
+                .ins()
+                .load(types::I64, MemFlags::new(), ptr, Offset32::new(0)))
+        }
+    }
+
+    /// Loads the given literal into the function as a Cranelift [`Value`].
+    /// If the literal is a string, loads a pointer to the string.
+    pub(super) fn load_lit(&mut self, lit: &Literal) -> Result<Value> {
+        match lit {
+            Literal::String(sid) => Ok(self.load_ptr(self.data.str_data_id(*sid)?)),
+            Literal::Int(i) => Ok(self.builder.ins().iconst(types::I64, *i)),
+            Literal::Float(f) => Ok(self.builder.ins().f64const(*f)),
+        }
+    }
+
+    /// Loads a pointer to the data associated with the given [`DataId`] into the function.
+    /// todo: Make this re-use static (read-only) global values instead of creating one every time.
+    pub(super) fn load_ptr(&mut self, data_id: DataId) -> Value {
+        let ptr_type = self.module.target_config().pointer_type();
+        let gv = self.module.declare_data_in_func(data_id, self.builder.func);
+        self.builder.ins().global_value(ptr_type, gv)
     }
 }

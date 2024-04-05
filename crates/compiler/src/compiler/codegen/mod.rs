@@ -24,6 +24,7 @@ use super::parser::{Ast, Spanned, Stat};
 mod data;
 mod func;
 mod intrinsics;
+mod utils;
 
 /// Base code generator state.
 pub struct CodeGenerator<'cfg, 'src> {

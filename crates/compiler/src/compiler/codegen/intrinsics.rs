@@ -5,7 +5,6 @@ use cranelift_module::{FuncId, Module};
 use cranelift_object::ObjectModule;
 use miette::Result;
 
-
 /// Manages importing Cobalt intrinsics (libc functions, etc.) into generated output modules/functions.
 /// Must be called at the function translate stage, and have its held [`FuncRef`] cache reset after each function
 /// using [`IntrinsicManager::clear_refs()`].
@@ -15,7 +14,7 @@ pub(super) struct IntrinsicManager {
 
     /// Function-level references for Cobalt intrinsics.
     /// Must be reset per-function with [`IntrinsicManager::clear_refs()`].
-    refs: HashMap<CobaltIntrinsic, FuncRef>
+    refs: HashMap<CobaltIntrinsic, FuncRef>,
 }
 
 /// A comprehensive list of all available intrinsics in Cobalt.
@@ -24,7 +23,9 @@ pub(super) struct IntrinsicManager {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum CobaltIntrinsic {
     LibcPutchar, // int putc(char)
-    PrintStr, // void print_str(char*)
+    PrintStr,    // void cb_print_str(char*)
+    PrintFloat,  // void cb_print_f64(f64)
+    PrintInt,    // void cb_print_i64(i64)
 }
 
 impl IntrinsicManager {
@@ -32,13 +33,18 @@ impl IntrinsicManager {
     pub fn new() -> Self {
         Self {
             funcs: HashMap::new(),
-            refs: HashMap::new()
+            refs: HashMap::new(),
         }
     }
 
     /// Returns a function reference for the given Cobalt intrinsic.
     /// If one does not exist, creates one. Should only be called from within function translation.
-    pub fn get_ref(&mut self, module: &mut ObjectModule, func: &mut Function, i: CobaltIntrinsic) -> Result<&FuncRef> {
+    pub fn get_ref(
+        &mut self,
+        module: &mut ObjectModule,
+        func: &mut Function,
+        i: CobaltIntrinsic,
+    ) -> Result<&FuncRef> {
         // If we've used this intrinsic in the current function before, return the existing ref.
         if self.refs.contains_key(&i) {
             return Ok(self.refs.get(&i).unwrap());
@@ -63,7 +69,11 @@ impl IntrinsicManager {
     }
 
     /// Attempts to import the given intrinsic into the current module.
-    fn import_intrinsic(&mut self, module: &mut ObjectModule, i: CobaltIntrinsic) -> Result<&FuncId> {
+    fn import_intrinsic(
+        &mut self,
+        module: &mut ObjectModule,
+        i: CobaltIntrinsic,
+    ) -> Result<&FuncId> {
         // Sanity check.
         assert!(!self.funcs.contains_key(&i));
 
@@ -71,11 +81,15 @@ impl IntrinsicManager {
         let mut sig = module.make_signature();
         match i {
             CobaltIntrinsic::LibcPutchar => libcputchar_sig(&mut sig),
-            CobaltIntrinsic::PrintStr => printstr_sig(&mut sig, module)
+            CobaltIntrinsic::PrintStr => printstr_sig(&mut sig, module),
+            CobaltIntrinsic::PrintFloat => printfloat_sig(&mut sig),
+            CobaltIntrinsic::PrintInt => printint_sig(&mut sig),
         };
         let name = match i {
             CobaltIntrinsic::LibcPutchar => "putchar",
-            CobaltIntrinsic::PrintStr => "cb_print_str"
+            CobaltIntrinsic::PrintStr => "cb_print_str",
+            CobaltIntrinsic::PrintFloat => "cb_print_f64",
+            CobaltIntrinsic::PrintInt => "cb_print_i64",
         };
 
         // Import it.
@@ -99,4 +113,14 @@ fn libcputchar_sig(sig: &mut Signature) {
 fn printstr_sig(sig: &mut Signature, module: &mut ObjectModule) {
     let ptr_type = module.target_config().pointer_type();
     sig.params.push(AbiParam::new(ptr_type));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::PrintFloat`].
+fn printfloat_sig(sig: &mut Signature) {
+    sig.params.push(AbiParam::new(types::F64));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::PrintInt`].
+fn printint_sig(sig: &mut Signature) {
+    sig.params.push(AbiParam::new(types::I64));
 }
