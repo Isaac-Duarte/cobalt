@@ -1,10 +1,13 @@
-use cranelift::{codegen::ir::immediates::Offset32, prelude::*};
+use cranelift::{
+    codegen::ir::{immediates::Offset32, GlobalValue},
+    prelude::*,
+};
 use cranelift_module::{DataId, Module};
 use miette::Result;
 
 use crate::compiler::parser::{self, Literal, MoveData};
 
-use super::FuncTranslator;
+use super::{value::CodegenLiteral, FuncTranslator};
 
 impl<'src> FuncTranslator<'src> {
     /// Generates Cranelift IR for a single "MOVE" statement.
@@ -42,33 +45,22 @@ impl<'src> FuncTranslator<'src> {
     /// Assumes that the literal has already been checked for compatibility with this data slot.
     pub(super) fn translate_mov_lit(&mut self, lit: &Literal, dest: &str) -> Result<()> {
         let dest_id = self.data.sym_data_id(dest)?;
-        let dest_pic = self.data.sym_pic(dest)?;
 
         // Import the destination variable into the function, get a pointer to it.
-        let dest_gv = self.module.declare_data_in_func(dest_id, self.builder.func);
         let ptr_type = self.module.target_config().pointer_type();
-        let dest_ptr = self.builder.ins().global_value(ptr_type, dest_gv);
+        let dest_ptr = self.load_static_ptr(dest_id)?;
+        let src_val = self.load_lit(lit)?;
+
+        // Load the relevant PIC.
+        let dest_pic = self.data.sym_pic(dest)?;
 
         match lit {
-            Literal::Int(i) => {
-                let i_val = self.builder.ins().iconst(types::I64, *i);
+            Literal::Int(_) | Literal::Float(_) => {
                 self.builder
                     .ins()
-                    .store(MemFlags::new(), i_val, dest_ptr, Offset32::new(0));
-            }
-            Literal::Float(f) => {
-                let f_val = self.builder.ins().f64const(*f);
-                self.builder
-                    .ins()
-                    .store(MemFlags::new(), f_val, dest_ptr, Offset32::new(0));
+                    .store(MemFlags::new(), src_val, dest_ptr, Offset32::new(0));
             }
             Literal::String(sid) => {
-                // Import the string literal into the function, get a pointer.
-                let string_gv = self
-                    .module
-                    .declare_data_in_func(self.data.str_data_id(*sid)?, self.builder.func);
-                let string_ptr = self.builder.ins().global_value(ptr_type, string_gv);
-
                 // Get the size of the string to copy.
                 let size = self
                     .ast
@@ -86,12 +78,8 @@ impl<'src> FuncTranslator<'src> {
                 assert!(size <= dest_pic.comp_size());
 
                 // Perform a straight memory copy of the value.
-                self.builder.call_memcpy(
-                    self.module.target_config(),
-                    dest_ptr,
-                    string_ptr,
-                    size_val,
-                );
+                self.builder
+                    .call_memcpy(self.module.target_config(), dest_ptr, src_val, size_val);
             }
         }
         Ok(())
@@ -100,15 +88,16 @@ impl<'src> FuncTranslator<'src> {
     /// Moves the given global variable into the provided global data slot.
     /// Assumes that the variable has already been checked for compatibility with this data slot.
     fn translate_mov_var(&mut self, src: &str, dest: &str) -> Result<()> {
-        let (src_id, src_pic) = (self.data.sym_data_id(src)?, self.data.sym_pic(src)?);
-        let (dest_id, dest_pic) = (self.data.sym_data_id(dest)?, self.data.sym_pic(dest)?);
-
         // Import both variables as global values, get pointers to them.
         let ptr_type = self.module.target_config().pointer_type();
-        let dest_gv = self.module.declare_data_in_func(dest_id, self.builder.func);
-        let dest_ptr = self.builder.ins().global_value(ptr_type, dest_gv);
-        let src_gv = self.module.declare_data_in_func(src_id, self.builder.func);
-        let src_ptr = self.builder.ins().global_value(ptr_type, src_gv);
+        let (src_id, dest_id) = (self.data.sym_data_id(src)?, self.data.sym_data_id(dest)?);
+        let (src_ptr, dest_ptr) = (
+            self.load_static_ptr(src_id)?,
+            self.load_static_ptr(dest_id)?,
+        );
+
+        // Load the PIC for the source/destination.
+        let (src_pic, dest_pic) = (self.data.sym_pic(src)?, self.data.sym_pic(dest)?);
 
         // Sanity check.
         assert!(src_pic.comp_size() <= dest_pic.comp_size());
@@ -158,7 +147,7 @@ impl<'src> FuncTranslator<'src> {
     /// Loads the given variable into the function as a Cranelift [`Value`].
     /// If the variable is a string, loads a pointer to the string.
     pub(super) fn load_var(&mut self, sym: &'src str) -> Result<Value> {
-        let ptr = self.load_ptr(self.data.sym_data_id(sym)?);
+        let ptr = self.load_static_ptr(self.data.sym_data_id(sym)?)?;
         let pic = self.data.sym_pic(sym)?;
         if pic.is_str() {
             Ok(ptr)
@@ -178,18 +167,61 @@ impl<'src> FuncTranslator<'src> {
     /// Loads the given literal into the function as a Cranelift [`Value`].
     /// If the literal is a string, loads a pointer to the string.
     pub(super) fn load_lit(&mut self, lit: &Literal) -> Result<Value> {
-        match lit {
-            Literal::String(sid) => Ok(self.load_ptr(self.data.str_data_id(*sid)?)),
-            Literal::Int(i) => Ok(self.builder.ins().iconst(types::I64, *i)),
-            Literal::Float(f) => Ok(self.builder.ins().f64const(*f)),
+        // Is the value in cache?
+        if let Some(val) = self.values.get_litv(lit) {
+            return Ok(val);
         }
+
+        // No, load the value & store it in cache.
+        let litv = match lit {
+            Literal::String(sid) => self.load_static_ptr(self.data.str_data_id(*sid)?)?,
+            Literal::Int(i) => self.builder.ins().iconst(types::I64, *i),
+            Literal::Float(f) => self.builder.ins().f64const(*f),
+        };
+        self.values.insert_litv(lit, litv.clone())?;
+        Ok(litv)
     }
 
-    /// Loads a pointer to the data associated with the given [`DataId`] into the function.
-    /// todo: Make this re-use static (read-only) global values instead of creating one every time.
-    pub(super) fn load_ptr(&mut self, data_id: DataId) -> Value {
+    /// Loads the given codegen-only literal into the function as a Cranelift [`Value`].
+    /// Utilises cache when available.
+    pub(super) fn load_cg_lit(&mut self, cglit: &CodegenLiteral) -> Result<Value> {
+        // Is it in cache?
+        if let Some(val) = self.values.get_cg_litv(cglit) {
+            return Ok(val);
+        }
+
+        // No, we still need to load it first.
+        let cglitv = match cglit {
+            CodegenLiteral::Char(c) => self.builder.ins().iconst(types::I8, (*c as u8) as i64),
+        };
+        self.values.insert_cg_litv(cglit, cglitv.clone())?;
+        Ok(cglitv)
+    }
+
+    /// Loads an immutable pointer to the data associated with the given [`DataId`] into the function.
+    /// Utilises static value cache when possible.
+    pub(super) fn load_static_ptr(&mut self, data_id: DataId) -> Result<Value> {
+        // Check whether this pointer is in cache.
+        if let Some(sptr) = self.values.get_static_ptr(&data_id) {
+            return Ok(sptr);
+        }
+
+        // Not in cache, load it up.
         let ptr_type = self.module.target_config().pointer_type();
+        let gv = self.load_gv(data_id)?;
+        let sptr = self.builder.ins().global_value(ptr_type, gv);
+        self.values.insert_static_ptr(&data_id, sptr.clone())?;
+        Ok(sptr)
+    }
+
+    /// Loads a single [`GlobalValue`] into the current function, caching it if not already present.
+    /// If the given data ID has already been loaded, returns the GV from cache.
+    fn load_gv(&mut self, data_id: DataId) -> Result<GlobalValue> {
+        if let Some(gv) = self.values.get_gv(&data_id) {
+            return Ok(gv);
+        }
         let gv = self.module.declare_data_in_func(data_id, self.builder.func);
-        self.builder.ins().global_value(ptr_type, gv)
+        self.values.insert_gv(&data_id, gv.clone())?;
+        Ok(gv)
     }
 }

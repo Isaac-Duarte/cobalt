@@ -82,7 +82,7 @@ impl<'src> FuncTranslator<'src> {
             };
 
             // Save the resulting value in the destination.
-            let dest_ptr = self.load_ptr(self.data.sym_data_id(dest)?);
+            let dest_ptr = self.load_static_ptr(self.data.sym_data_id(dest)?)?;
             self.builder
                 .ins()
                 .store(MemFlags::new(), final_val, dest_ptr, Offset32::new(0));

@@ -3,11 +3,14 @@ use cranelift::frontend::FunctionBuilder;
 use cranelift_object::ObjectModule;
 use miette::Result;
 
+use self::value::ValueCache;
+
 use super::{data::DataManager, intrinsics::IntrinsicManager};
 
 mod io;
 mod math;
 mod memory;
+mod value;
 
 /// Structure for translating function-level AST nodes to Cranelift IR.
 pub(super) struct FuncTranslator<'src> {
@@ -25,9 +28,30 @@ pub(super) struct FuncTranslator<'src> {
 
     /// The data manager for this function.
     pub data: &'src mut DataManager,
+
+    /// Cache of values loaded for this function.
+    values: ValueCache,
 }
 
 impl<'src> FuncTranslator<'src> {
+    /// Creates a new function translator.
+    pub fn new(
+        builder: FunctionBuilder<'src>,
+        module: &'src mut ObjectModule,
+        ast: &'src Ast<'src>,
+        intrinsics: &'src mut IntrinsicManager,
+        data: &'src mut DataManager,
+    ) -> Self {
+        Self {
+            builder,
+            module,
+            ast,
+            intrinsics,
+            data,
+            values: ValueCache::new(),
+        }
+    }
+
     /// Generates Cranelift IR for a single statement from the given set of statements.
     pub fn translate(&mut self, stats: &Vec<Spanned<Stat<'src>>>) -> Result<()> {
         // Reset the intrinsics manager, since we're beginning a new function.

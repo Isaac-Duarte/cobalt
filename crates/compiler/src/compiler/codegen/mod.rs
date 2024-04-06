@@ -129,13 +129,13 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
             builder.seal_block(entry_block);
 
             // Create function translator, translate all statements.
-            let mut trans = FuncTranslator {
+            let mut trans = FuncTranslator::new(
                 builder,
-                module: &mut self.module,
+                &mut self.module,
                 ast,
-                intrinsics: &mut self.intrinsics,
-                data: &mut self.data_manager,
-            };
+                &mut self.intrinsics,
+                &mut self.data_manager,
+            );
             trans.translate(stats)?;
 
             // Emit the return statement (for now, 0).

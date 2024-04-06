@@ -44,10 +44,10 @@ impl IntrinsicManager {
         module: &mut ObjectModule,
         func: &mut Function,
         i: CobaltIntrinsic,
-    ) -> Result<&FuncRef> {
+    ) -> Result<FuncRef> {
         // If we've used this intrinsic in the current function before, return the existing ref.
         if self.refs.contains_key(&i) {
-            return Ok(self.refs.get(&i).unwrap());
+            return Ok(*self.refs.get(&i).unwrap());
         }
 
         // If we haven't imported the intrinsic into the module yet, do that.
@@ -60,7 +60,7 @@ impl IntrinsicManager {
         // Create a new reference for this function.
         let func_ref = module.declare_func_in_func(*func_id, func);
         self.refs.insert(i, func_ref);
-        Ok(self.refs.get(&i).unwrap())
+        Ok(*self.refs.get(&i).unwrap())
     }
 
     /// Clears existing function references remaining in the intrinsic manager.

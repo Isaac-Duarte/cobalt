@@ -55,7 +55,7 @@ impl DataManager {
     }
 
     /// Returns the [`Pic`] layout associated with the given COBOL symbol.
-    pub(super) fn sym_pic<'a>(&self, sym: &'a str) -> Result<&Pic> {
+    pub(super) fn sym_pic<'a>(&'a self, sym: &str) -> Result<&Pic> {
         self.sym_map
             .get(sym)
             .map(|o| &o.1)

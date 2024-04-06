@@ -1,7 +1,13 @@
+use std::{fmt::Display, hash::Hash};
+
 use bimap::BiMap;
 use miette::Result;
 
-use super::{parser_bail, token::{tok, Token}, Parser, ParserErrorContext};
+use super::{
+    parser_bail,
+    token::{tok, Token},
+    Parser, ParserErrorContext,
+};
 
 /// ID for a single string literal within the AST.
 pub type StrLitId = usize;
@@ -19,7 +25,7 @@ pub(crate) struct StrLitStore {
 
     /// The current ID counter.
     /// This must be globally unique across both arrays, to avoid ID collisions.
-    cur_id: StrLitId
+    cur_id: StrLitId,
 }
 
 impl StrLitStore {
@@ -28,7 +34,7 @@ impl StrLitStore {
         Self {
             lit_map: BiMap::new(),
             transient_map: BiMap::new(),
-            cur_id: 0
+            cur_id: 0,
         }
     }
 
@@ -66,19 +72,66 @@ impl StrLitStore {
     pub fn get(&self, lit_id: StrLitId) -> Option<&String> {
         match self.lit_map.get_by_left(&lit_id) {
             Some(x) => Some(x),
-            None => {
-                self.transient_map.get_by_left(&lit_id)
-            }
+            None => self.transient_map.get_by_left(&lit_id),
         }
     }
 }
 
 /// A single generic literal within a COBOL AST.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum Literal {
     String(StrLitId),
     Int(i64),
-    Float(f64)   
+    Float(f64),
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String(sid) => f.write_fmt(format_args!("str_{}", sid)),
+            Self::Int(i) => f.write_fmt(format_args!("{}", i)),
+            Self::Float(fl) => f.write_fmt(format_args!("{}", fl)),
+        }
+    }
+}
+
+impl Hash for Literal {
+    /// Hashes the literal. Required for HashMap, etc.
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Literal::String(sid) => {
+                state.write_u8(1);
+                sid.hash(state);
+            }
+            Literal::Int(i) => {
+                state.write_u8(2);
+                i.hash(state);
+            }
+            Literal::Float(f) => {
+                state.write_u8(3);
+                // Yes, this is bad and jank.
+                // It doesn't really matter for us though, since we only use this hash for caching purposes,
+                // so all we're really leaking is another (very similar) entry in cache.
+                for b in f.to_ne_bytes() {
+                    state.write_u8(b);
+                }
+            }
+        }
+    }
+}
+
+impl Eq for Literal {}
+
+impl PartialEq for Literal {
+    /// Returns whether this literal matches the other provided literal.
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::String(l0), Self::String(r0)) => l0 == r0,
+            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
+            (Self::Float(l0), Self::Float(r0)) => l0 == r0,
+            _ => false,
+        }
+    }
 }
 
 impl Literal {
@@ -87,7 +140,7 @@ impl Literal {
         match self {
             Self::String(sid) => str_lits.get(*sid).unwrap().clone(),
             Self::Int(i) => i.to_string(),
-            Self::Float(f) => f.to_string()
+            Self::Float(f) => f.to_string(),
         }
     }
 }
@@ -101,15 +154,15 @@ impl<'src> Parser<'src> {
                 let text = self.consume_str()?;
                 let id = self.str_lits.insert(text);
                 Ok(Literal::String(id))
-            },
+            }
             Token::IntLiteral => {
                 let int = self.consume_int()?;
                 Ok(Literal::Int(int))
-            },
+            }
             Token::FloatLiteral => {
                 let float = self.consume_float()?;
                 Ok(Literal::Float(float))
-            },
+            }
             _ => {
                 let next = self.next()?;
                 parser_bail!(self, "Expected a literal, instead found '{}'.", next.0);

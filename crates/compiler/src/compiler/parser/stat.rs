@@ -1,4 +1,4 @@
-use super::{token::tok, Parser, Value};
+use super::{parser_bail, token::tok, Parser, Value};
 use miette::Result;
 
 /// Represents a single executable statement within a COBOL program.
@@ -16,7 +16,16 @@ impl<'src> Parser<'src> {
             tok![display] => self.parse_display(),
             tok![move] => self.parse_move(),
             tok![add] => self.parse_add(),
-            _ => unreachable!(),
+
+            // Unknown token.
+            tok @ _ => {
+                self.next()?;
+                parser_bail!(
+                    self,
+                    "Invalid token '{}' encountered, expected beginning of statement.",
+                    tok
+                );
+            }
         }
     }
 

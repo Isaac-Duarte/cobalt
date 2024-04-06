@@ -1,8 +1,8 @@
 use crate::compiler::{codegen::intrinsics::CobaltIntrinsic, parser};
-use cranelift::codegen::ir::{types, InstBuilder};
+use cranelift::codegen::ir::InstBuilder;
 use miette::Result;
 
-use super::FuncTranslator;
+use super::{value::CodegenLiteral, FuncTranslator};
 
 impl<'src> FuncTranslator<'src> {
     /// Generates Cranelift IR for a single "DISPLAY" statement.
@@ -25,7 +25,7 @@ impl<'src> FuncTranslator<'src> {
             let display_func =
                 self.intrinsics
                     .get_ref(self.module, self.builder.func, display_intrinsic)?;
-            self.builder.ins().call(*display_func, &[display_val]);
+            self.builder.ins().call(display_func, &[display_val]);
         }
 
         // All values displayed, now call "putchar" and insert a newline.
@@ -34,8 +34,8 @@ impl<'src> FuncTranslator<'src> {
             self.builder.func,
             CobaltIntrinsic::LibcPutchar,
         )?;
-        let newline = self.builder.ins().iconst(types::I8, ('\n' as u8) as i64);
-        self.builder.ins().call(*putchar, &[newline]);
+        let newline = self.load_cg_lit(&CodegenLiteral::Char('\n'))?;
+        self.builder.ins().call(putchar, &[newline]);
 
         Ok(())
     }

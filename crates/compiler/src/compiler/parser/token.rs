@@ -127,7 +127,7 @@ pub(crate) enum Token {
     // [A-Z0-9][A-Z0-9-]*[A-Z0-9]|[A-Z0-9]+
     #[regex(r#"[A-Z0-9][A-Z0-9-]+"#)]
     Identifier,
-    #[regex(r"//[^\n]*")]
+    #[regex(r"//[^\n]*[\n]*")]
     SingleLineComment,
     #[regex(r"((\r)?\n)+")]
     EOL,
