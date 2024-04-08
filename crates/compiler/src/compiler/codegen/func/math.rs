@@ -30,7 +30,11 @@ impl<'src> FuncTranslator<'src> {
     }
 
     /// Translates a single basic math operation (ADD, SUB, MUL) into Cranelift IR.
-    fn translate_basic_op(&mut self, op_data: &BasicMathOpData<'src>, op_type: BasicMathOp) -> Result<()> {
+    fn translate_basic_op(
+        &mut self,
+        op_data: &BasicMathOpData<'src>,
+        op_type: BasicMathOp,
+    ) -> Result<()> {
         println!("{:#?}", op_data);
 
         // Verify this instruction is sane.
@@ -74,8 +78,10 @@ impl<'src> FuncTranslator<'src> {
 
         // Combine all of the source values to get a total without including the destination.
         // We repeat this for float output if required.
-        let combined_srcs = self.combine_sources_vec(src_vals, op_type, op_data.overwrite_dests, false);
-        let combined_float_srcs = float_srcs.map(|f_srcs| self.combine_sources_vec(f_srcs, op_type, op_data.overwrite_dests, true));
+        let combined_srcs =
+            self.combine_sources_vec(src_vals, op_type, op_data.overwrite_dests, false);
+        let combined_float_srcs = float_srcs
+            .map(|f_srcs| self.combine_sources_vec(f_srcs, op_type, op_data.overwrite_dests, true));
 
         // For each destination, we need to generate a new calculation.
         for dest in op_data.dests.iter() {
@@ -104,7 +110,7 @@ impl<'src> FuncTranslator<'src> {
                         } else {
                             self.builder.ins().iadd(src_sum_val, dest_val)
                         }
-                    },
+                    }
                     BasicMathOp::Subtract => {
                         // out = dest - src
                         if results_in_float {
@@ -112,7 +118,7 @@ impl<'src> FuncTranslator<'src> {
                         } else {
                             self.builder.ins().isub(dest_val, src_sum_val)
                         }
-                    },
+                    }
                     BasicMathOp::Multiply => {
                         // out = dest * src
                         if results_in_float {
@@ -139,7 +145,13 @@ impl<'src> FuncTranslator<'src> {
 
     /// Combines a vector of source values, returning their combined value.
     /// Supports source combination for both integer and floating point addition, subtraction and multiplication.
-    fn combine_sources_vec(&mut self, vals: Vec<Value>, op_type: BasicMathOp, is_overwrite: bool, is_float: bool) -> Value {
+    fn combine_sources_vec(
+        &mut self,
+        vals: Vec<Value>,
+        op_type: BasicMathOp,
+        is_overwrite: bool,
+        is_float: bool,
+    ) -> Value {
         assert!(vals.len() > 0);
 
         // If there's only one input value, no need to combine anything.
@@ -179,9 +191,15 @@ impl<'src> FuncTranslator<'src> {
         }
         cur_val
     }
-    
+
     /// Combines the two given  source values for the given basic mathematical operation.
-    fn combine_sources(&mut self, left: Value, right: Value, op_type: BasicMathOp, is_float: bool) -> Value {
+    fn combine_sources(
+        &mut self,
+        left: Value,
+        right: Value,
+        op_type: BasicMathOp,
+        is_float: bool,
+    ) -> Value {
         match op_type {
             // We actually perform an add for the "SUBTRACT" instruction, as the real calculation
             // for SUBTRACT is `dest - sum(sources)`.
@@ -191,7 +209,7 @@ impl<'src> FuncTranslator<'src> {
                 } else {
                     self.builder.ins().iadd(left, right)
                 }
-            },
+            }
             BasicMathOp::Multiply => {
                 if is_float {
                     self.builder.ins().fmul(left, right)

@@ -1,4 +1,8 @@
-use super::{parser_bail, token::{tok, Token}, Parser, Value};
+use super::{
+    parser_bail,
+    token::{tok, Token},
+    Parser, Value,
+};
 use miette::Result;
 
 /// Represents a single executable statement within a COBOL program.
@@ -7,7 +11,8 @@ pub(crate) enum Stat<'src> {
     Display(Vec<Value<'src>>),
     Move(MoveData<'src>),
     Add(BasicMathOpData<'src>),
-    Subtract(BasicMathOpData<'src>)
+    Subtract(BasicMathOpData<'src>),
+    Multiply(BasicMathOpData<'src>),
 }
 
 impl<'src> Parser<'src> {
@@ -18,6 +23,7 @@ impl<'src> Parser<'src> {
             tok![move] => self.parse_move(),
             tok![add] => self.parse_add(),
             tok![subtract] => self.parse_subtract(),
+            tok![multiply] => self.parse_multiply(),
 
             // Unknown token.
             tok @ _ => {
@@ -98,10 +104,19 @@ impl<'src> Parser<'src> {
         self.consume(tok![subtract])?;
         let op_data = self.parse_math_op(tok![from])?;
         self.consume_vec(&[tok![.], tok![eol]])?;
-        
+
         Ok(Stat::Subtract(op_data))
     }
-    
+
+    /// Parses a single "MULTIPLY" statement from the current position.
+    fn parse_multiply(&mut self) -> Result<Stat<'src>> {
+        self.consume(tok![multiply])?;
+        let op_data = self.parse_math_op(tok![by])?;
+        self.consume_vec(&[tok![.], tok![eol]])?;
+
+        Ok(Stat::Multiply(op_data))
+    }
+
     /// Parses data for a single mathematical operation (ADD, SUB, MUL) from the current location.
     /// Takes a separator which denotes the end of the source arguments and beginning of destination arguments.
     fn parse_math_op(&mut self, sep: Token) -> Result<BasicMathOpData<'src>> {
@@ -147,7 +162,7 @@ impl<'src> Parser<'src> {
         Ok(BasicMathOpData {
             sources,
             dests,
-            overwrite_dests
+            overwrite_dests,
         })
     }
 }
