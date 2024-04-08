@@ -18,10 +18,12 @@ macro_rules! tok {
     [add] => { $crate::compiler::parser::Token::Add };
     [subtract] => { $crate::compiler::parser::Token::Subtract };
     [multiply] => { $crate::compiler::parser::Token::Multiply };
+    [divide] => { $crate::compiler::parser::Token::Divide };
     [move] => { $crate::compiler::parser::Token::Move };
     [to] => { $crate::compiler::parser::Token::To };
     [from] => { $crate::compiler::parser::Token::From };
     [by] => { $crate::compiler::parser::Token::By };
+    [into] => { $crate::compiler::parser::Token::Into };
     [giving] => { $crate::compiler::parser::Token::Giving };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
     [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
@@ -114,14 +116,18 @@ pub(crate) enum Token {
     Subtract,
     #[token("MULTIPLY")]
     Multiply,
+    #[token("DIVIDE")]
+    Divide,
     #[token("MOVE")]
     Move,
     #[token("TO", priority = 5)]
     To,
-    #[token("FROM", priority = 5)]
+    #[token("FROM")]
     From,
     #[token("BY", priority = 5)]
     By,
+    #[token("INTO")]
+    Into,
     #[token("GIVING")]
     Giving,
     #[token(".")]
@@ -166,10 +172,12 @@ impl Display for Token {
             Token::Add => write!(f, "ADD"),
             Token::Subtract => write!(f, "SUBTRACT"),
             Token::Multiply => write!(f, "MULTIPLY"),
+            Token::Divide => write!(f, "DIVIDE"),
             Token::Move => write!(f, "MOVE"),
             Token::To => write!(f, "TO"),
             Token::From => write!(f, "FROM"),
             Token::By => write!(f, "BY"),
+            Token::Into => write!(f, "INTO"),
             Token::Giving => write!(f, "GIVING"),
             Token::CtrlDot => write!(f, "."),
             Token::FloatLiteral => write!(f, "float-literal"),

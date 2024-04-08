@@ -1,7 +1,7 @@
 use cranelift::codegen::ir::{immediates::Offset32, types, InstBuilder, MemFlags, Value};
 use miette::Result;
 
-use crate::compiler::parser::{self, BasicMathOpData};
+use crate::compiler::parser::{self, BasicMathOpData, DivideData};
 
 use super::FuncTranslator;
 
@@ -38,7 +38,7 @@ impl<'src> FuncTranslator<'src> {
         println!("{:#?}", op_data);
 
         // Verify this instruction is sane.
-        self.verify_math_op_data(op_data)?;
+        self.verify_basic_op_data(op_data)?;
 
         // First, load all the sources.
         let mut src_vals: Vec<Value> = Vec::new();
@@ -220,8 +220,8 @@ impl<'src> FuncTranslator<'src> {
         }
     }
 
-    /// Verifies the given mathematical operation data.
-    fn verify_math_op_data(&self, op_data: &BasicMathOpData<'src>) -> Result<()> {
+    /// Verifies the given basic (ADD, SUB, MUL) mathematical operation data.
+    fn verify_basic_op_data(&self, op_data: &BasicMathOpData<'src>) -> Result<()> {
         // Check there are at least one source when appending to destination sources,
         // two sources when overwriting output & at least one output.
         if (op_data.sources.len() == 0 && !op_data.overwrite_dests)
@@ -269,6 +269,70 @@ impl<'src> FuncTranslator<'src> {
             }
         }
 
+        Ok(())
+    }
+
+    /// Translates a single DIVIDE statement into Cranelift IR.
+    pub(super) fn translate_divide(&mut self, div_data: &DivideData<'src>) -> Result<()> {
+        // Verify that this division is sane.
+        self.verify_divide(div_data)?;
+
+        // Load the dividend, divisor variable.
+        let (mut dd_val, mut dv_val) = (
+            self.load_var(div_data.dividend)?,
+            self.load_var(div_data.divisor)?,
+        );
+
+        // Convert either of them to float if necessary.
+        let (dd_pic, dv_pic) = (
+            self.data.sym_pic(div_data.dividend)?,
+            self.data.sym_pic(div_data.divisor)?,
+        );
+        let out_pic = self.data.sym_pic(div_data.out_var)?;
+        let results_in_float = dd_pic.is_float() || dv_pic.is_float() || out_pic.is_float();
+        if results_in_float {
+            if !dd_pic.is_float() {
+                dd_val = self.builder.ins().fcvt_from_sint(types::F64, dd_val);
+            }
+            if !dv_pic.is_float() {
+                dv_val = self.builder.ins().fcvt_from_sint(types::F64, dv_val);
+            }
+        }
+
+        // Perform the division.
+        let out_val = if results_in_float {
+            self.builder.ins().fdiv(dd_val, dv_val)
+        } else {
+            self.builder.ins().sdiv(dd_val, dv_val)
+        };
+
+        // Store the output.
+        let dest_ptr = self.load_static_ptr(self.data.sym_data_id(div_data.out_var)?)?;
+        self.builder
+            .ins()
+            .store(MemFlags::new(), out_val, dest_ptr, Offset32::new(0));
+        Ok(())
+    }
+
+    /// Verifies that the given DIVIDE instruction data is valid.
+    /// todo: Add support for rounding, remainder!
+    fn verify_divide(&self, div_data: &DivideData<'src>) -> Result<()> {
+        // Verify that both input types are numbers.
+        let (dividend_pic, divisor_pic) = (
+            self.data.sym_pic(div_data.dividend)?,
+            self.data.sym_pic(div_data.divisor)?,
+        );
+        if dividend_pic.is_str() || divisor_pic.is_str() {
+            miette::bail!("Cannot perform a DIVIDE operation on string type variables.");
+        }
+
+        // If one of the input types is a float, verify that the output type is a float.
+        let out_pic = self.data.sym_pic(div_data.out_var)?;
+        if (dividend_pic.is_float() || divisor_pic.is_float()) && !out_pic.is_float() {
+            miette::bail!(
+                "Cannot output the result of a floating point division to an integer variable."
+            );
+        }
         Ok(())
     }
 }

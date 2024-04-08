@@ -13,6 +13,7 @@ pub(crate) enum Stat<'src> {
     Add(BasicMathOpData<'src>),
     Subtract(BasicMathOpData<'src>),
     Multiply(BasicMathOpData<'src>),
+    Divide(DivideData<'src>),
 }
 
 impl<'src> Parser<'src> {
@@ -24,6 +25,7 @@ impl<'src> Parser<'src> {
             tok![add] => self.parse_add(),
             tok![subtract] => self.parse_subtract(),
             tok![multiply] => self.parse_multiply(),
+            tok![divide] => self.parse_divide(),
 
             // Unknown token.
             tok @ _ => {
@@ -164,5 +166,73 @@ impl<'src> Parser<'src> {
             dests,
             overwrite_dests,
         })
+    }
+}
+
+/// Operand data for a single DIVIDE instruction.
+#[derive(Debug)]
+pub(crate) struct DivideData<'src> {
+    /// The variable being divided.
+    pub dividend: &'src str,
+
+    /// The variable used as the divisor.
+    pub divisor: &'src str,
+
+    /// The variable that output is placed in.
+    /// May be the same as the divisor.
+    pub out_var: &'src str,
+}
+
+impl<'src> Parser<'src> {
+    /// Parses a single "DIVIDE" statement from the current position.
+    fn parse_divide(&mut self) -> Result<Stat<'src>> {
+        self.consume(tok![divide])?;
+        let first_tok = self.consume(tok![ident])?;
+
+        // Determine whether we're dividing the first variable by the second, or
+        // the second variable by the first.
+        let left_to_right = if self.peek() == tok![by] {
+            self.next()?;
+            true
+        } else if self.peek() == tok![into] {
+            self.next()?;
+            false
+        } else {
+            let err_tok = self.next()?.0;
+            parser_bail!(
+                self,
+                "Expected either 'INTO' or 'BY', instead found '{err_tok}'."
+            );
+        };
+
+        let second_tok = self.consume(tok![ident])?;
+
+        // If we're using "BY", there must be a "GIVING" clause.
+        let out_var = if self.peek() == tok![giving] {
+            self.next()?;
+            let output_tok = self.consume(tok![ident])?;
+            self.text(output_tok)
+        } else if !left_to_right {
+            self.text(second_tok)
+        } else {
+            parser_bail!(
+                self,
+                "DIVIDE statements utilising a 'BY' clause must also include a 'GIVING' clause."
+            );
+        };
+        self.consume_vec(&[tok![.], tok![eol]])?;
+
+        // Determine which token is the dividend, and which is the divisor.
+        let (dividend_tok, divisor_tok) = if left_to_right {
+            (first_tok, second_tok)
+        } else {
+            (second_tok, first_tok)
+        };
+
+        Ok(Stat::Divide(DivideData {
+            dividend: self.text(dividend_tok),
+            divisor: self.text(divisor_tok),
+            out_var,
+        }))
     }
 }

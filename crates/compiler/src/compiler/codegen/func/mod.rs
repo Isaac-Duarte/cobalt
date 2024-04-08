@@ -72,6 +72,7 @@ impl<'src> FuncTranslator<'src> {
             Stat::Add(op_data) => self.translate_add(op_data)?,
             Stat::Subtract(op_data) => self.translate_subtract(op_data)?,
             Stat::Multiply(op_data) => self.translate_multiply(op_data)?,
+            Stat::Divide(div_data) => self.translate_divide(div_data)?,
         }
         Ok(())
     }
