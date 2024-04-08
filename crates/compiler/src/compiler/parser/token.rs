@@ -16,8 +16,10 @@ macro_rules! tok {
     [stop_run] => { $crate::compiler::parser::Token::StopRun };
     [display] => { $crate::compiler::parser::Token::Display };
     [add] => { $crate::compiler::parser::Token::Add };
+    [subtract] => { $crate::compiler::parser::Token::Subtract };
     [move] => { $crate::compiler::parser::Token::Move };
     [to] => { $crate::compiler::parser::Token::To };
+    [from] => { $crate::compiler::parser::Token::From };
     [giving] => { $crate::compiler::parser::Token::Giving };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
     [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
@@ -106,10 +108,14 @@ pub(crate) enum Token {
     Display,
     #[token("ADD")]
     Add,
+    #[token("SUBTRACT")]
+    Subtract,
     #[token("MOVE")]
     Move,
     #[token("TO", priority = 5)]
     To,
+    #[token("FROM", priority = 5)]
+    From,
     #[token("GIVING")]
     Giving,
     #[token(".")]
@@ -152,8 +158,10 @@ impl Display for Token {
             Token::StopRun => write!(f, "STOP RUN"),
             Token::Display => write!(f, "DISPLAY"),
             Token::Add => write!(f, "ADD"),
+            Token::Subtract => write!(f, "SUBTRACT"),
             Token::Move => write!(f, "MOVE"),
             Token::To => write!(f, "TO"),
+            Token::From => write!(f, "FROM"),
             Token::Giving => write!(f, "GIVING"),
             Token::CtrlDot => write!(f, "."),
             Token::FloatLiteral => write!(f, "float-literal"),

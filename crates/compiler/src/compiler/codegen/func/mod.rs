@@ -69,7 +69,8 @@ impl<'src> FuncTranslator<'src> {
         match &stat.0 {
             Stat::Display(vals) => self.translate_display(vals)?,
             Stat::Move(mov_data) => self.translate_move(mov_data)?,
-            Stat::Add(add_data) => self.translate_add(add_data)?,
+            Stat::Add(op_data) => self.translate_add(op_data)?,
+            Stat::Subtract(op_data) => self.translate_subtract(op_data)?,
         }
         Ok(())
     }
