@@ -2,7 +2,7 @@ use crate::compiler::{codegen::intrinsics::CobaltIntrinsic, parser};
 use cranelift::codegen::ir::InstBuilder;
 use miette::Result;
 
-use super::{var::CodegenLiteral, FuncTranslator};
+use super::{value::CodegenLiteral, FuncTranslator};
 
 impl<'src> FuncTranslator<'src> {
     /// Generates Cranelift IR for a single "DISPLAY" statement.

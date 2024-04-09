@@ -1,9 +1,9 @@
 use crate::compiler::parser::{Ast, Spanned, Stat};
-use cranelift::frontend::FunctionBuilder;
+use cranelift::{codegen::ir::Block, frontend::FunctionBuilder};
 use cranelift_object::ObjectModule;
 use miette::Result;
 
-use self::var::VariableCache;
+use self::value::ValueCache;
 
 use super::{data::DataManager, intrinsics::IntrinsicManager};
 
@@ -11,7 +11,7 @@ mod cond;
 mod io;
 mod math;
 mod memory;
-mod var;
+mod value;
 
 /// Structure for translating function-level AST nodes to Cranelift IR.
 pub(super) struct FuncTranslator<'src> {
@@ -30,8 +30,8 @@ pub(super) struct FuncTranslator<'src> {
     /// The data manager for this function.
     pub data: &'src mut DataManager,
 
-    /// Cache of variables/values loaded for this function.
-    var_cache: VariableCache,
+    /// Cache of values loaded for this function.
+    values: ValueCache,
 }
 
 impl<'src> FuncTranslator<'src> {
@@ -49,7 +49,7 @@ impl<'src> FuncTranslator<'src> {
             ast,
             intrinsics,
             data,
-            var_cache: VariableCache::new(),
+            values: ValueCache::new(),
         }
     }
 
@@ -77,5 +77,12 @@ impl<'src> FuncTranslator<'src> {
             Stat::If(if_data) => self.translate_if(if_data)?,
         }
         Ok(())
+    }
+
+    /// Switches the function translator to point to the given block.
+    /// The prior block must have a terminator instruction inserted before this is called.
+    fn switch_to_block(&mut self, block: Block) {
+        self.values.begin_block();
+        self.builder.switch_to_block(block);
     }
 }

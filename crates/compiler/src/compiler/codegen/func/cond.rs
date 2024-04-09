@@ -34,7 +34,7 @@ impl<'src> FuncTranslator<'src> {
 
         // Switch to the if block, translate contents.
         // Once the if block is done, we jump to the trailing block.
-        self.builder.switch_to_block(if_block);
+        self.switch_to_block(if_block);
         for stat in if_data.if_stats.as_ref().unwrap() {
             self.translate_stat(stat)?;
         }
@@ -47,7 +47,7 @@ impl<'src> FuncTranslator<'src> {
 
         // If there's an else block, translate contents.
         if let Some(else_stats) = if_data.else_stats.as_ref() {
-            self.builder.switch_to_block(else_block.unwrap());
+            self.switch_to_block(else_block.unwrap());
             for stat in else_stats {
                 self.translate_stat(stat)?;
             }
@@ -56,7 +56,7 @@ impl<'src> FuncTranslator<'src> {
         }
 
         // Switch to the trailing block, set as current block.
-        self.builder.switch_to_block(trailing_block);
+        self.switch_to_block(trailing_block);
         Ok(())
     }
 

@@ -4,9 +4,10 @@ PROGRAM-ID. DATA-TEST.
 DATA DIVISION.
     WORKING-STORAGE SECTION.
     01 INTEGER-A PIC 99(4)9 COMP VALUE 20.
+    01 STRING-A PIC X(12) VALUE "Testing".
 
 PROCEDURE DIVISION.
-    IF INTEGER-A = 20 THEN
+    IF STRING-A = "Testing" THEN
         DISPLAY "Hello branching!".
     ELSE
         DISPLAY "This shouldn't appear.".
