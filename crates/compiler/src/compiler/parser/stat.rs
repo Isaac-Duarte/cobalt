@@ -1,7 +1,5 @@
 use super::{
-    parser_bail,
-    token::{tok, Token},
-    Parser, Value,
+    parser_bail, token::{tok, Token}, Parser, Spanned, Value
 };
 use miette::Result;
 
@@ -14,18 +12,21 @@ pub(crate) enum Stat<'src> {
     Subtract(BasicMathOpData<'src>),
     Multiply(BasicMathOpData<'src>),
     Divide(DivideData<'src>),
+    If(IfData<'src>)
 }
 
 impl<'src> Parser<'src> {
     /// Parses a single statement from the current parser position.
-    pub(super) fn stat(&mut self) -> Result<Stat<'src>> {
-        match self.peek() {
-            tok![display] => self.parse_display(),
-            tok![move] => self.parse_move(),
-            tok![add] => self.parse_add(),
-            tok![subtract] => self.parse_subtract(),
-            tok![multiply] => self.parse_multiply(),
-            tok![divide] => self.parse_divide(),
+    pub(super) fn stat(&mut self) -> Result<Spanned<Stat<'src>>> {
+        let start_idx = self.peek_idx();
+        let stat = match self.peek() {
+            tok![display] => self.parse_display()?,
+            tok![move] => self.parse_move()?,
+            tok![add] => self.parse_add()?,
+            tok![subtract] => self.parse_subtract()?,
+            tok![multiply] => self.parse_multiply()?,
+            tok![divide] => self.parse_divide()?,
+            tok![if] => self.parse_if()?,
 
             // Unknown token.
             tok @ _ => {
@@ -36,7 +37,9 @@ impl<'src> Parser<'src> {
                     tok
                 );
             }
-        }
+        };
+
+        Ok((stat, (start_idx, self.cur_idx()).into()))
     }
 
     /// Parses a single "DISPLAY" statement from the current parser position.
@@ -234,5 +237,80 @@ impl<'src> Parser<'src> {
             divisor: self.text(divisor_tok),
             out_var,
         }))
+    }
+}
+
+/// Data required for a single "IF" conditional.
+#[derive(Debug)]
+pub(crate) struct IfData<'src> {
+    pub condition: Cond<'src>,
+    pub if_stats: Option<Vec<Spanned<Stat<'src>>>>,
+    pub else_stats: Option<Vec<Spanned<Stat<'src>>>>,
+}
+
+/// A single generic condition within Cobalt.
+#[derive(Debug)]
+pub(crate) enum Cond<'src> {
+    Eq(Value<'src>, Value<'src>),
+    // Ge(Value<'src>, Value<'src>),
+    // Le(Value<'src>, Value<'src>),
+    // Gt(Value<'src>, Value<'src>),
+    // Lt(Value<'src>, Value<'src>),
+    // Ne(Value<'src>, Value<'src>),
+    // And(Box<Cond<'src>>, Box<Cond<'src>>),
+    // Or(Box<Cond<'src>>, Box<Cond<'src>>),
+    // Not(Box<Cond<'src>>),
+}
+
+impl<'src> Parser<'src> {
+    /// Parses a single "IF" statement from the current position.
+    fn parse_if(&mut self) -> Result<Stat<'src>> {
+        self.consume(tok![if])?;
+        let condition = self.parse_cond()?;
+        self.consume_vec(&[tok![then], tok![eol]])?;
+
+        // Iterate & parse out "IF" statement block.
+        let mut if_stats: Vec<Spanned<Stat<'src>>> = Vec::new();
+        while self.peek() != tok![end] && self.peek() != tok![else] {
+            if_stats.push(self.stat()?);
+        }
+        let if_stats = (if_stats.len() > 0).then(|| if_stats);
+
+        // If there's an "ELSE" statement block, parse that out.
+        let else_stats = if self.peek() == tok![else] {
+            self.consume_vec(&[tok![else], tok![eol]])?;
+            let mut stats: Vec<Spanned<Stat<'src>>> = Vec::new();
+            while self.peek() != tok![end] {
+                stats.push(self.stat()?);
+            }
+            Some(stats)
+        } else {
+            None
+        };
+
+        // todo:
+        // if if_stats.len() == 0 {
+        //     if_stats = else_stats;
+        //     else_stats = None;
+        //     cond = Cond::Not(cond);   
+        // }
+
+        self.consume_vec(&[tok![end], tok![if], tok![.], tok![eol]])?;
+
+        Ok(Stat::If(IfData {
+            if_stats,
+            else_stats,
+            condition
+        }))
+    }
+
+    /// Parses a single condition from the current position.
+    /// todo: Implement remaining conditional types.
+    fn parse_cond(&mut self) -> Result<Cond<'src>> {
+        let first_op = self.value()?;
+        self.consume(tok![=])?;
+        let second_op = self.value()?;
+
+        Ok(Cond::Eq(first_op, second_op))
     }
 }

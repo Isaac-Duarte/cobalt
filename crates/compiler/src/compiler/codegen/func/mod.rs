@@ -3,14 +3,15 @@ use cranelift::frontend::FunctionBuilder;
 use cranelift_object::ObjectModule;
 use miette::Result;
 
-use self::value::ValueCache;
+use self::var::VariableCache;
 
 use super::{data::DataManager, intrinsics::IntrinsicManager};
 
+mod cond;
 mod io;
 mod math;
 mod memory;
-mod value;
+mod var;
 
 /// Structure for translating function-level AST nodes to Cranelift IR.
 pub(super) struct FuncTranslator<'src> {
@@ -29,8 +30,8 @@ pub(super) struct FuncTranslator<'src> {
     /// The data manager for this function.
     pub data: &'src mut DataManager,
 
-    /// Cache of values loaded for this function.
-    values: ValueCache,
+    /// Cache of variables/values loaded for this function.
+    var_cache: VariableCache,
 }
 
 impl<'src> FuncTranslator<'src> {
@@ -48,7 +49,7 @@ impl<'src> FuncTranslator<'src> {
             ast,
             intrinsics,
             data,
-            values: ValueCache::new(),
+            var_cache: VariableCache::new(),
         }
     }
 
@@ -73,6 +74,7 @@ impl<'src> FuncTranslator<'src> {
             Stat::Subtract(op_data) => self.translate_subtract(op_data)?,
             Stat::Multiply(op_data) => self.translate_multiply(op_data)?,
             Stat::Divide(div_data) => self.translate_divide(div_data)?,
+            Stat::If(if_data) => self.translate_if(if_data)?,
         }
         Ok(())
     }

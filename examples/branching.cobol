@@ -1,0 +1,19 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. DATA-TEST.
+
+DATA DIVISION.
+    WORKING-STORAGE SECTION.
+    01 INTEGER-A PIC 99(4)9 COMP VALUE 20.
+
+PROCEDURE DIVISION.
+    IF INTEGER-A = 20 THEN
+        DISPLAY "Hello branching!".
+    ELSE
+        DISPLAY "This shouldn't appear.".
+    END IF.
+
+    MOVE 50 TO INTEGER-A.
+    IF INTEGER-A = 20 THEN
+        DISPLAY "This shouldn't appear.".
+    END IF.
+STOP RUN.

@@ -146,17 +146,17 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
             trans.builder.finalize();
         }
 
+        // Verify that the function is valid.
+        println!("{}", self.ctx.func.display());
+        verify_function(&self.ctx.func, self.module.isa())
+            .map_err(|err| miette::diagnostic!("codegen: Function verification failed: {}", err))?;
+
         // Define the function from the built function held in ctx.
         self.module
             .define_function(func_id, &mut self.ctx)
             .map_err(|err| {
                 miette::diagnostic!("codegen: Failed to define function body: {}", err)
             })?;
-
-        // Verify that the function is valid.
-        verify_function(&self.ctx.func, self.module.isa())
-            .map_err(|err| miette::diagnostic!("codegen: Function verification failed: {}", err))?;
-        println!("{}", self.ctx.func.display());
 
         self.module.clear_context(&mut self.ctx);
         Ok(())

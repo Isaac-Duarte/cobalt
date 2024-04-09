@@ -3,7 +3,7 @@ use std::{
     fmt::{Display, Write},
 };
 
-use cranelift::codegen::ir::{GlobalValue, Value};
+use cranelift::{codegen::{entity::EntityRef, ir::GlobalValue}, frontend::Variable};
 use cranelift_module::DataId;
 use miette::Result;
 
@@ -23,30 +23,41 @@ impl Display for CodegenLiteral {
     }
 }
 
-/// Collection of cached values used within a [`super::FuncTranslator`].
-pub(super) struct ValueCache {
+/// Collection of cached variables & global values used within a [`super::FuncTranslator`].
+pub(super) struct VariableCache {
     /// Cache of global values loaded for the current function.
     gv_cache: HashMap<DataId, GlobalValue>,
 
-    /// Cache of static pointers loaded for the current function.
-    sptr_cache: HashMap<DataId, Value>,
+    /// Cache of static pointer variables loaded for the current function.
+    sptr_cache: HashMap<DataId, Variable>,
 
-    /// Cache of static literal values loaded for the current function.
-    litv_cache: HashMap<Literal, Value>,
+    /// Cache of static literal variables loaded for the current function.
+    litv_cache: HashMap<Literal, Variable>,
 
-    /// Cache of codegen-only literal values from the code generator.
-    cglit_cache: HashMap<CodegenLiteral, Value>,
+    /// Cache of codegen-only literal variables from the code generator.
+    cglit_cache: HashMap<CodegenLiteral, Variable>,
+
+    /// The current globally unique variable index.
+    cur_var: usize
 }
 
-impl ValueCache {
-    /// Creates a new function value cache.
+impl VariableCache {
+    /// Creates a new function variable cache.
     pub fn new() -> Self {
         Self {
             gv_cache: HashMap::new(),
             sptr_cache: HashMap::new(),
             litv_cache: HashMap::new(),
             cglit_cache: HashMap::new(),
+            cur_var: 0
         }
+    }
+
+    /// Creates a new unique variable for use within the variable cache.
+    pub fn create_var(&mut self) -> Variable {
+        let var = Variable::new(self.cur_var);
+        self.cur_var += 1;
+        var
     }
 
     /// Searches the cache for a loaded [`GlobalValue`] for the given ID.
@@ -54,18 +65,18 @@ impl ValueCache {
         self.gv_cache.get(data_id).map(|x| *x)
     }
 
-    /// Searches the cache for a static pointer [`Value`] for the given ID.
-    pub fn get_static_ptr(&self, data_id: &DataId) -> Option<Value> {
+    /// Searches the cache for a static pointer [`Variable`] for the given ID.
+    pub fn get_static_ptr(&self, data_id: &DataId) -> Option<Variable> {
         self.sptr_cache.get(data_id).map(|x| *x)
     }
 
-    /// Searches the cache for a loaded literal [`Value`] for the given ID.
-    pub fn get_litv(&self, lit: &Literal) -> Option<Value> {
+    /// Searches the cache for a loaded literal [`Variable`] for the given ID.
+    pub fn get_litv(&self, lit: &Literal) -> Option<Variable> {
         self.litv_cache.get(lit).map(|x| *x)
     }
 
     /// Searches the cache for a loaded [`CodegenLiteral`].
-    pub fn get_cg_litv(&self, cglit: &CodegenLiteral) -> Option<Value> {
+    pub fn get_cg_litv(&self, cglit: &CodegenLiteral) -> Option<Variable> {
         self.cglit_cache.get(cglit).map(|x| *x)
     }
 
@@ -80,8 +91,8 @@ impl ValueCache {
         Ok(())
     }
 
-    /// Inserts the given static pointer [`Value`] into cache. Throws an error if the data is already present.
-    pub fn insert_static_ptr(&mut self, data_id: &DataId, sptr: Value) -> Result<()> {
+    /// Inserts the given static pointer [`Variable`] into cache. Throws an error if the data is already present.
+    pub fn insert_static_ptr(&mut self, data_id: &DataId, sptr: Variable) -> Result<()> {
         if Self::insert_item(&mut self.sptr_cache, data_id, sptr) {
             miette::bail!(
                 "codegen: Duplicate entry for static pointer ID '{}' in sptr cache.",
@@ -91,8 +102,8 @@ impl ValueCache {
         Ok(())
     }
 
-    /// Inserts the given static literal [`Value`] into cache. Throws an error if the data is already present.
-    pub fn insert_litv(&mut self, lit: &Literal, litv: Value) -> Result<()> {
+    /// Inserts the given static literal [`Variable`] into cache. Throws an error if the data is already present.
+    pub fn insert_litv(&mut self, lit: &Literal, litv: Variable) -> Result<()> {
         if Self::insert_item(&mut self.litv_cache, lit, litv) {
             miette::bail!(
                 "codegen: Duplicate entry for literal '{}' in literal value cache.",
@@ -102,8 +113,8 @@ impl ValueCache {
         Ok(())
     }
 
-    /// Inserts the given codegen literal [`Value`] into cache. Throws an error if the data is already present.
-    pub fn insert_cg_litv(&mut self, cglit: &CodegenLiteral, cglitv: Value) -> Result<()> {
+    /// Inserts the given codegen literal [`Variable`] into cache. Throws an error if the data is already present.
+    pub fn insert_cg_litv(&mut self, cglit: &CodegenLiteral, cglitv: Variable) -> Result<()> {
         if Self::insert_item(&mut self.cglit_cache, cglit, cglitv) {
             miette::bail!(
                 "codegen: Duplicate entry for codegen literal '{}' in cglitv cache.",

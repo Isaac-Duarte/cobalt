@@ -46,11 +46,9 @@ impl<'src> Parser<'src> {
         self.consume_vec(&[tok![proc_div], tok![.], tok![eol]])?;
 
         // Parse statements until we peek a "STOP RUN".
-        let mut stats: Vec<Spanned<Stat>> = Vec::new();
+        let mut stats: Vec<Spanned<Stat<'src>>> = Vec::new();
         while self.peek() != tok![stop_run] {
-            let start_idx = self.peek_idx();
-            let stat = self.stat()?;
-            stats.push((stat, (start_idx, self.cur_idx()).into()));
+            stats.push(self.stat()?);
         }
 
         // Consume the stop, EOF.

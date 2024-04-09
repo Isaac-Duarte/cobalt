@@ -26,6 +26,7 @@ pub(super) enum CobaltIntrinsic {
     PrintStr,    // void cb_print_str(char*)
     PrintFloat,  // void cb_print_f64(f64)
     PrintInt,    // void cb_print_i64(i64)
+    StrCmp,      // i64 cb_strcmp(char*, char*)
 }
 
 impl IntrinsicManager {
@@ -84,12 +85,14 @@ impl IntrinsicManager {
             CobaltIntrinsic::PrintStr => printstr_sig(&mut sig, module),
             CobaltIntrinsic::PrintFloat => printfloat_sig(&mut sig),
             CobaltIntrinsic::PrintInt => printint_sig(&mut sig),
+            CobaltIntrinsic::StrCmp => strcmp_sig(&mut sig, module),
         };
         let name = match i {
             CobaltIntrinsic::LibcPutchar => "putchar",
             CobaltIntrinsic::PrintStr => "cb_print_str",
             CobaltIntrinsic::PrintFloat => "cb_print_f64",
             CobaltIntrinsic::PrintInt => "cb_print_i64",
+            CobaltIntrinsic::StrCmp => "cb_strcmp",
         };
 
         // Import it.
@@ -123,4 +126,12 @@ fn printfloat_sig(sig: &mut Signature) {
 /// Generates a function signature for [`CobaltIntrinsic::PrintInt`].
 fn printint_sig(sig: &mut Signature) {
     sig.params.push(AbiParam::new(types::I64));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::StrCmp`].
+fn strcmp_sig(sig: &mut Signature, module: &mut ObjectModule) {
+    let ptr_type = module.target_config().pointer_type();
+    sig.params.push(AbiParam::new(ptr_type));
+    sig.params.push(AbiParam::new(ptr_type));
+    sig.returns.push(AbiParam::new(types::I64));
 }

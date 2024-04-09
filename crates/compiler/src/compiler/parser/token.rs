@@ -25,6 +25,11 @@ macro_rules! tok {
     [by] => { $crate::compiler::parser::Token::By };
     [into] => { $crate::compiler::parser::Token::Into };
     [giving] => { $crate::compiler::parser::Token::Giving };
+    [if] => { $crate::compiler::parser::Token::If };
+    [then] => { $crate::compiler::parser::Token::Then };
+    [else] => { $crate::compiler::parser::Token::Else };
+    [end] => { $crate::compiler::parser::Token::End };
+    [=] => { $crate::compiler::parser::Token::Equals };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
     [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
     [int_lit] => { $crate::compiler::parser::Token::IntLiteral };
@@ -130,6 +135,16 @@ pub(crate) enum Token {
     Into,
     #[token("GIVING")]
     Giving,
+    #[token("IF", priority = 5)]
+    If,
+    #[token("THEN")]
+    Then,
+    #[token("ELSE")]
+    Else,
+    #[token("END")]
+    End,
+    #[token("=")]
+    Equals,
     #[token(".")]
     CtrlDot,
     #[regex(r#"(-)?[0-9]+\.[0-9]+"#)]
@@ -179,6 +194,11 @@ impl Display for Token {
             Token::By => write!(f, "BY"),
             Token::Into => write!(f, "INTO"),
             Token::Giving => write!(f, "GIVING"),
+            Token::If => write!(f, "IF"),
+            Token::Then => write!(f, "THEN"),
+            Token::Else => write!(f, "ELSE"),
+            Token::End => write!(f, "END"),
+            Token::Equals => write!(f, "="),
             Token::CtrlDot => write!(f, "."),
             Token::FloatLiteral => write!(f, "float-literal"),
             Token::IntLiteral => write!(f, "int-literal"),

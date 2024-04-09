@@ -7,7 +7,7 @@ use miette::Result;
 
 use crate::compiler::parser::{self, Literal, MoveData};
 
-use super::{value::CodegenLiteral, FuncTranslator};
+use super::{var::CodegenLiteral, FuncTranslator};
 
 impl<'src> FuncTranslator<'src> {
     /// Generates Cranelift IR for a single "MOVE" statement.
@@ -167,61 +167,87 @@ impl<'src> FuncTranslator<'src> {
     /// Loads the given literal into the function as a Cranelift [`Value`].
     /// If the literal is a string, loads a pointer to the string.
     pub(super) fn load_lit(&mut self, lit: &Literal) -> Result<Value> {
-        // Is the value in cache?
-        if let Some(val) = self.values.get_litv(lit) {
-            return Ok(val);
+        // Is the variable in cache?
+        if let Some(var) = self.var_cache.get_litv(lit) {
+            return Ok(self.builder.use_var(var));
         }
 
-        // No, load the value & store it in cache.
-        let litv = match lit {
-            Literal::String(sid) => self.load_static_ptr(self.data.str_data_id(*sid)?)?,
-            Literal::Int(i) => self.builder.ins().iconst(types::I64, *i),
-            Literal::Float(f) => self.builder.ins().f64const(*f),
-        };
-        self.values.insert_litv(lit, litv.clone())?;
-        Ok(litv)
+        // No, load the value & store it inside a variable in cache.
+        let var = self.var_cache.create_var();
+        let ptr_type = self.module.target_config().pointer_type();
+        match lit {
+            Literal::String(sid) => {
+                let val = self.load_static_ptr(self.data.str_data_id(*sid)?)?;
+                self.builder.declare_var(var, ptr_type);
+                self.builder.def_var(var, val);
+            },
+            Literal::Int(i) => {
+                let val = self.builder.ins().iconst(types::I64, *i);
+                self.builder.declare_var(var, types::I64);
+                self.builder.def_var(var, val);
+            },
+            Literal::Float(f) => {
+                let val = self.builder.ins().f64const(*f);
+                self.builder.declare_var(var, types::F64);
+                self.builder.def_var(var, val);
+            },
+        }
+        self.var_cache.insert_litv(lit, var)?;
+        Ok(self.builder.use_var(var))
     }
 
     /// Loads the given codegen-only literal into the function as a Cranelift [`Value`].
-    /// Utilises cache when available.
+    /// Utilises variable cache when available.
     pub(super) fn load_cg_lit(&mut self, cglit: &CodegenLiteral) -> Result<Value> {
-        // Is it in cache?
-        if let Some(val) = self.values.get_cg_litv(cglit) {
-            return Ok(val);
+        // Is a variable holding this literal in cache?
+        if let Some(var) = self.var_cache.get_cg_litv(cglit) {
+            return Ok(self.builder.use_var(var));
         }
 
-        // No, we still need to load it first.
-        let cglitv = match cglit {
-            CodegenLiteral::Char(c) => self.builder.ins().iconst(types::I8, (*c as u8) as i64),
-        };
-        self.values.insert_cg_litv(cglit, cglitv.clone())?;
-        Ok(cglitv)
+        // No, we still need to load it first, then store in cache.
+        let var = self.var_cache.create_var();
+        match cglit {
+            CodegenLiteral::Char(c) => {
+                let val = self.builder.ins().iconst(types::I8, (*c as u8) as i64);
+                self.builder.declare_var(var, types::I8);
+                self.builder.def_var(var, val);
+            },
+        }
+        self.var_cache.insert_cg_litv(cglit, var)?;
+        Ok(self.builder.use_var(var))
     }
 
     /// Loads an immutable pointer to the data associated with the given [`DataId`] into the function.
-    /// Utilises static value cache when possible.
+    /// Utilises static variable cache when possible.
     pub(super) fn load_static_ptr(&mut self, data_id: DataId) -> Result<Value> {
-        // Check whether this pointer is in cache.
-        if let Some(sptr) = self.values.get_static_ptr(&data_id) {
-            return Ok(sptr);
+        // Check whether a variable holding this pointer is in cache.
+        if let Some(sptr) = self.var_cache.get_static_ptr(&data_id) {
+            return Ok(self.builder.use_var(sptr));
         }
 
         // Not in cache, load it up.
+        // We also declare a variable for this pointer to place in cache.
         let ptr_type = self.module.target_config().pointer_type();
+        let var = self.var_cache.create_var();
+        self.builder.declare_var(var, ptr_type);
+
+        // Load the pointer into the variable, use it.
         let gv = self.load_gv(data_id)?;
-        let sptr = self.builder.ins().global_value(ptr_type, gv);
-        self.values.insert_static_ptr(&data_id, sptr.clone())?;
-        Ok(sptr)
+        let sptr_val = self.builder.ins().global_value(ptr_type, gv);
+        self.builder.def_var(var, sptr_val);
+
+        self.var_cache.insert_static_ptr(&data_id, var)?;
+        Ok(self.builder.use_var(var))
     }
 
     /// Loads a single [`GlobalValue`] into the current function, caching it if not already present.
     /// If the given data ID has already been loaded, returns the GV from cache.
     fn load_gv(&mut self, data_id: DataId) -> Result<GlobalValue> {
-        if let Some(gv) = self.values.get_gv(&data_id) {
+        if let Some(gv) = self.var_cache.get_gv(&data_id) {
             return Ok(gv);
         }
         let gv = self.module.declare_data_in_func(data_id, self.builder.func);
-        self.values.insert_gv(&data_id, gv.clone())?;
+        self.var_cache.insert_gv(&data_id, gv.clone())?;
         Ok(gv)
     }
 }
