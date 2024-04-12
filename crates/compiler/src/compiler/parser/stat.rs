@@ -1,3 +1,5 @@
+use crate::compiler::parser::parser_bail_spanned;
+
 use super::{
     parser_bail, token::{tok, Token}, Parser, Spanned, Value
 };
@@ -252,14 +254,13 @@ pub(crate) struct IfData<'src> {
 #[derive(Debug)]
 pub(crate) enum Cond<'src> {
     Eq(Value<'src>, Value<'src>),
-    // Ge(Value<'src>, Value<'src>),
-    // Le(Value<'src>, Value<'src>),
-    // Gt(Value<'src>, Value<'src>),
-    // Lt(Value<'src>, Value<'src>),
-    // Ne(Value<'src>, Value<'src>),
+    Ge(Value<'src>, Value<'src>),
+    Le(Value<'src>, Value<'src>),
+    Gt(Value<'src>, Value<'src>),
+    Lt(Value<'src>, Value<'src>),
     // And(Box<Cond<'src>>, Box<Cond<'src>>),
     // Or(Box<Cond<'src>>, Box<Cond<'src>>),
-    // Not(Box<Cond<'src>>),
+    Not(Box<Cond<'src>>),
 }
 
 impl<'src> Parser<'src> {
@@ -289,7 +290,7 @@ impl<'src> Parser<'src> {
         };
 
         // todo:
-        // if if_stats.len() == 0 {
+        // if if_stats.len() == 0 && else_stats.len() > 0 {
         //     if_stats = else_stats;
         //     else_stats = None;
         //     cond = Cond::Not(cond);   
@@ -307,10 +308,28 @@ impl<'src> Parser<'src> {
     /// Parses a single condition from the current position.
     /// todo: Implement remaining conditional types.
     fn parse_cond(&mut self) -> Result<Cond<'src>> {
+        // If there's a preceding "NOT", we NOT a following condition.
+        if self.peek() == tok![not] {
+            self.next()?;
+            return Ok(Cond::Not(Box::new(self.parse_cond()?)));
+        }
+
+        // Parse out an initial value, operator & second value.
         let first_op = self.value()?;
-        self.consume(tok![=])?;
+        let operator = self.next()?;
         let second_op = self.value()?;
 
-        Ok(Cond::Eq(first_op, second_op))
+        let cond = match operator.0 {
+            tok![=] => Cond::Eq(first_op, second_op),
+            tok![<] => Cond::Lt(first_op, second_op),
+            tok![>] => Cond::Gt(first_op, second_op),
+            tok![<=] => Cond::Le(first_op, second_op),
+            tok![>=] => Cond::Ge(first_op, second_op),
+            tok @ _ => {
+                parser_bail_spanned!(self, operator.1, "Unknown operator '{}' used in conditional.", tok);
+            }
+        };
+
+        Ok(cond)
     }
 }

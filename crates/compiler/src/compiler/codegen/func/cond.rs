@@ -68,12 +68,20 @@ impl<'src> FuncTranslator<'src> {
         self.verify_cond(cond)?;
 
         match cond {
-            Cond::Eq(l, r) => self.translate_cond_eq(l, r),
+            // Comparisons.
+            Cond::Eq(l, r) => self.translate_cond_comp(l, r, IntCC::Equal, FloatCC::Equal),
+            Cond::Ge(l, r) => self.translate_cond_comp(l, r, IntCC::SignedGreaterThanOrEqual, FloatCC::GreaterThanOrEqual),
+            Cond::Le(l, r) => self.translate_cond_comp(l, r, IntCC::SignedLessThanOrEqual, FloatCC::LessThanOrEqual),
+            Cond::Gt(l, r) => self.translate_cond_comp(l, r, IntCC::SignedGreaterThan, FloatCC::GreaterThan),
+            Cond::Lt(l, r) => self.translate_cond_comp(l, r, IntCC::SignedLessThan, FloatCC::LessThan),
+
+            // Recursive conditions.
+            Cond::Not(inner) => self.translate_cond_not(inner)
         }
     }
 
-    /// Translates a single equality condition into a given value.
-    fn translate_cond_eq(&mut self, l: &parser::Value<'src>, r: &parser::Value<'src>) -> Result<Value> {
+    /// Translates a single comparison condition into a given value.
+    fn translate_cond_comp(&mut self, l: &parser::Value<'src>, r: &parser::Value<'src>, int_cc: IntCC, float_cc: FloatCC) -> Result<Value> {
         let (mut l_val, mut r_val) = (self.load_value(l)?, self.load_value(r)?);
         let use_float_cmp = l.is_float(&self.data)? || r.is_float(&self.data)?;
         
@@ -89,23 +97,40 @@ impl<'src> FuncTranslator<'src> {
 
         // Perform the comparison based on type.
         let result = if l.is_str(&self.data)? || r.is_str(&self.data)?  {
-            // String comparison, we must use our `strcmp` intrinsic.
+            // String comparison, this must be an equality. We must use our `strcmp` intrinsic.
+            assert!(int_cc == IntCC::Equal && float_cc == FloatCC::Equal);
             let strcmp = self.intrinsics.get_ref(&mut self.module, &mut self.builder.func, CobaltIntrinsic::StrCmp)?;
             let inst = self.builder.ins().call(strcmp, &[l_val, r_val]);
             *self.builder.inst_results(inst).get(0).expect("Strcmp intrinsic does not return a result.")
         } else if use_float_cmp {
-            self.builder.ins().fcmp(FloatCC::Equal, l_val, r_val)
+            self.builder.ins().fcmp(float_cc, l_val, r_val)
         } else {
-            self.builder.ins().icmp(IntCC::Equal, l_val, r_val)
+            self.builder.ins().icmp(int_cc, l_val, r_val)
         };
 
         Ok(result)
     }
 
+    /// Translates a single inverted "NOT" condition into Cranelift IR, returning the generated value.
+    fn translate_cond_not(&mut self, inner: &Cond<'src>) -> Result<Value> {
+        let inner_val = self.translate_cond_eval(inner)?;
+        Ok(self.builder.ins().bxor_imm(inner_val, 0x1))
+    }
+
     /// Verifies that the condition provided is sane, and can be computed.
     fn verify_cond(&self, cond: &Cond<'src>) -> Result<()> {
         match cond {
-            Cond::Eq(left, right) => self.verify_binary_eq_cmp(left, right)
+            // Equality comparisons.
+            Cond::Eq(left, right) => self.verify_binary_eq_cmp(left, right),
+
+            // Ordinal comparisons.
+            Cond::Ge(left, right) => self.verify_binary_ord_cmp(left, right),
+            Cond::Le(left, right) => self.verify_binary_ord_cmp(left, right),
+            Cond::Gt(left, right) => self.verify_binary_ord_cmp(left, right),
+            Cond::Lt(left, right) => self.verify_binary_ord_cmp(left, right),
+
+            // Recursive conditionals.
+            Cond::Not(inner) => self.verify_cond(inner)
         }
     }
 
@@ -120,6 +145,10 @@ impl<'src> FuncTranslator<'src> {
 
     /// Verifies that the two values can be compared ordinally.
     fn verify_binary_ord_cmp(&self, left: &parser::Value<'src>, right: &parser::Value<'src>) -> Result<()> {
-        unimplemented!()
+        // String types cannot be ordinally compared.
+        if left.is_str(&self.data)? || right.is_str(&self.data)? {
+            miette::bail!("Cannot ordinally compare string variables.");
+        }
+        Ok(())
     }
 }

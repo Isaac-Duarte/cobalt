@@ -29,7 +29,12 @@ macro_rules! tok {
     [then] => { $crate::compiler::parser::Token::Then };
     [else] => { $crate::compiler::parser::Token::Else };
     [end] => { $crate::compiler::parser::Token::End };
+    [not] => { $crate::compiler::parser::Token::Not };
     [=] => { $crate::compiler::parser::Token::Equals };
+    [<=] => { $crate::compiler::parser::Token::LessThanEqual };
+    [>=] => { $crate::compiler::parser::Token::GreaterThanEqual };
+    [<] => { $crate::compiler::parser::Token::LessThan };
+    [>] => { $crate::compiler::parser::Token::GreaterThan };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
     [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
     [int_lit] => { $crate::compiler::parser::Token::IntLiteral };
@@ -143,8 +148,18 @@ pub(crate) enum Token {
     Else,
     #[token("END")]
     End,
+    #[token("NOT")]
+    Not,
     #[token("=")]
     Equals,
+    #[token("<=")]
+    LessThanEqual,
+    #[token(">=")]
+    GreaterThanEqual,
+    #[token("<")]
+    LessThan,
+    #[token(">")]
+    GreaterThan,
     #[token(".")]
     CtrlDot,
     #[regex(r#"(-)?[0-9]+\.[0-9]+"#)]
@@ -198,7 +213,12 @@ impl Display for Token {
             Token::Then => write!(f, "THEN"),
             Token::Else => write!(f, "ELSE"),
             Token::End => write!(f, "END"),
+            Token::Not => write!(f, "NOT"),
             Token::Equals => write!(f, "="),
+            Token::LessThanEqual => write!(f, "<="),
+            Token::GreaterThanEqual => write!(f, ">="),
+            Token::LessThan => write!(f, "<"),
+            Token::GreaterThan => write!(f, ">"),
             Token::CtrlDot => write!(f, "."),
             Token::FloatLiteral => write!(f, "float-literal"),
             Token::IntLiteral => write!(f, "int-literal"),

@@ -16,7 +16,7 @@ mod lits;
 mod stat;
 mod token;
 
-//Macro for exiting with a given parser error message.
+/// Macro for exiting with a given parser error message.
 macro_rules! parser_bail {
     ($parser:expr, $msg:tt) => {{
         return Err($crate::compiler::parser::GenericParseError::new($parser, format!($msg)))?
@@ -27,6 +27,18 @@ macro_rules! parser_bail {
     }};
 }
 pub(crate) use parser_bail;
+
+/// Macro for exiting with a given error message and span.
+macro_rules! parser_bail_spanned {
+    ($parser:expr, $span:expr, $msg:tt) => {{
+        return Err($crate::compiler::parser::GenericParseError::with_span($parser, $span, format!($msg)))?
+    }};
+
+    ($parser:expr, $span:expr, $msg:tt, $($arg:tt)*) => {{
+        return Err($crate::compiler::parser::GenericParseError::with_span($parser, $span, format!($msg, $($arg)*)))?
+    }};
+}
+pub(crate) use parser_bail_spanned;
 
 /// Exports.
 pub use ast::Ast;
