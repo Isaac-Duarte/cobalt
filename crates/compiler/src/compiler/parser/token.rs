@@ -30,6 +30,8 @@ macro_rules! tok {
     [else] => { $crate::compiler::parser::Token::Else };
     [end] => { $crate::compiler::parser::Token::End };
     [not] => { $crate::compiler::parser::Token::Not };
+    [and] => { $crate::compiler::parser::Token::And };
+    [or] => { $crate::compiler::parser::Token::Or };
     [=] => { $crate::compiler::parser::Token::Equals };
     [<=] => { $crate::compiler::parser::Token::LessThanEqual };
     [>=] => { $crate::compiler::parser::Token::GreaterThanEqual };
@@ -150,6 +152,10 @@ pub(crate) enum Token {
     End,
     #[token("NOT")]
     Not,
+    #[token("AND")]
+    And,
+    #[token("OR", priority = 5)]
+    Or,
     #[token("=")]
     Equals,
     #[token("<=")]
@@ -214,6 +220,8 @@ impl Display for Token {
             Token::Else => write!(f, "ELSE"),
             Token::End => write!(f, "END"),
             Token::Not => write!(f, "NOT"),
+            Token::And => write!(f, "AND"),
+            Token::Or => write!(f, "OR"),
             Token::Equals => write!(f, "="),
             Token::LessThanEqual => write!(f, "<="),
             Token::GreaterThanEqual => write!(f, ">="),

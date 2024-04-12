@@ -32,4 +32,20 @@ PROCEDURE DIVISION.
         DISPLAY "Integer A is greater than 20.".
         DISPLAY "INTEGER-A = " INTEGER-A.
     END IF.
+
+    // Combined condition test.
+    IF INTEGER-A > 10 AND STRING-A = "Testing" THEN
+        DISPLAY "Combined condition test successful!".
+    END IF.
+    IF INTEGER-A < 10 AND STRING-A = "Testing" THEN
+        DISPLAY "Negative combined condition test failed...".
+    END IF.
+
+    // Alternate condition test.
+    IF INTEGER-A < 10 OR STRING-A = "Testing" THEN
+        DISPLAY "Alternate condition test successful!".
+    END IF.
+    IF INTEGER-A < 10 OR STRING-A = "Foo" THEN
+        DISPLAY "Negative alternate condition test failed...".
+    END IF.
 STOP RUN.

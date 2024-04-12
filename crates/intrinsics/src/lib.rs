@@ -44,11 +44,11 @@ pub unsafe extern "C" fn cb_print_f64(f: f64) {
     print!("{f}");
 }
 
-/// Compares two given strings, returning the following as an [`i64`]:
+/// Compares two given strings, returning the following as an [`i8`]:
 /// - If the two strings match, 1.
 /// - If the two strings do not match, 0.
 #[no_mangle]
-pub unsafe extern "C" fn cb_strcmp(str_a: *const c_char, str_b: *const c_char) -> i64 {
+pub unsafe extern "C" fn cb_strcmp(str_a: *const c_char, str_b: *const c_char) -> i8 {
     // Convert both strings into slices.
     let c_str: &CStr = unsafe { CStr::from_ptr(str_a) };
     let slice_a: &str = c_str.to_str().unwrap();

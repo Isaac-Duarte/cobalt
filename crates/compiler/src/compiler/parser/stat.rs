@@ -258,8 +258,8 @@ pub(crate) enum Cond<'src> {
     Le(Value<'src>, Value<'src>),
     Gt(Value<'src>, Value<'src>),
     Lt(Value<'src>, Value<'src>),
-    // And(Box<Cond<'src>>, Box<Cond<'src>>),
-    // Or(Box<Cond<'src>>, Box<Cond<'src>>),
+    And(Box<Cond<'src>>, Box<Cond<'src>>),
+    Or(Box<Cond<'src>>, Box<Cond<'src>>),
     Not(Box<Cond<'src>>),
 }
 
@@ -267,7 +267,7 @@ impl<'src> Parser<'src> {
     /// Parses a single "IF" statement from the current position.
     fn parse_if(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![if])?;
-        let condition = self.parse_cond()?;
+        let mut condition = self.parse_cond()?;
         self.consume_vec(&[tok![then], tok![eol]])?;
 
         // Iterate & parse out "IF" statement block.
@@ -275,10 +275,10 @@ impl<'src> Parser<'src> {
         while self.peek() != tok![end] && self.peek() != tok![else] {
             if_stats.push(self.stat()?);
         }
-        let if_stats = (if_stats.len() > 0).then(|| if_stats);
+        let mut if_stats = (if_stats.len() > 0).then(|| if_stats);
 
         // If there's an "ELSE" statement block, parse that out.
-        let else_stats = if self.peek() == tok![else] {
+        let mut else_stats = if self.peek() == tok![else] {
             self.consume_vec(&[tok![else], tok![eol]])?;
             let mut stats: Vec<Spanned<Stat<'src>>> = Vec::new();
             while self.peek() != tok![end] {
@@ -289,12 +289,12 @@ impl<'src> Parser<'src> {
             None
         };
 
-        // todo:
-        // if if_stats.len() == 0 && else_stats.len() > 0 {
-        //     if_stats = else_stats;
-        //     else_stats = None;
-        //     cond = Cond::Not(cond);   
-        // }
+        // If we only have an "ELSE" block, we can optimise into a simple inverted condition.
+        if if_stats.is_none() && else_stats.as_ref().is_some_and(|s| s.len() > 0) {
+            if_stats = else_stats;
+            else_stats = None;
+            condition = Cond::Not(Box::new(condition));   
+        }
 
         self.consume_vec(&[tok![end], tok![if], tok![.], tok![eol]])?;
 
@@ -319,7 +319,7 @@ impl<'src> Parser<'src> {
         let operator = self.next()?;
         let second_op = self.value()?;
 
-        let cond = match operator.0 {
+        let mut cond = match operator.0 {
             tok![=] => Cond::Eq(first_op, second_op),
             tok![<] => Cond::Lt(first_op, second_op),
             tok![>] => Cond::Gt(first_op, second_op),
@@ -329,6 +329,15 @@ impl<'src> Parser<'src> {
                 parser_bail_spanned!(self, operator.1, "Unknown operator '{}' used in conditional.", tok);
             }
         };
+
+        // If there's a following condition, recursively parse that.
+        if self.peek() == tok![and] || self.peek() == tok![or] {
+            cond = match self.next()?.0 {
+                tok![and] => Cond::And(Box::new(cond), Box::new(self.parse_cond()?)),
+                tok![or] => Cond::Or(Box::new(cond), Box::new(self.parse_cond()?)),
+                _ => unreachable!()
+            }
+        }
 
         Ok(cond)
     }

@@ -26,7 +26,7 @@ pub(super) enum CobaltIntrinsic {
     PrintStr,    // void cb_print_str(char*)
     PrintFloat,  // void cb_print_f64(f64)
     PrintInt,    // void cb_print_i64(i64)
-    StrCmp,      // i64 cb_strcmp(char*, char*)
+    StrCmp,      // i8 cb_strcmp(char*, char*)
 }
 
 impl IntrinsicManager {
@@ -133,5 +133,5 @@ fn strcmp_sig(sig: &mut Signature, module: &mut ObjectModule) {
     let ptr_type = module.target_config().pointer_type();
     sig.params.push(AbiParam::new(ptr_type));
     sig.params.push(AbiParam::new(ptr_type));
-    sig.returns.push(AbiParam::new(types::I64));
+    sig.returns.push(AbiParam::new(types::I8));
 }

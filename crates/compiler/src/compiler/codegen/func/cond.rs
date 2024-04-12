@@ -63,7 +63,7 @@ impl<'src> FuncTranslator<'src> {
     /// Translates an evaluation of the given conditional, returning the outcome of the condition.
     /// On the condition being true, the return value is an i64 with a value of 1.
     /// On the condition being false, the return value is an i64 with a value of 0.
-    fn translate_cond_eval(&mut self, cond: &Cond<'src>) -> Result<Value> {
+    pub(super) fn translate_cond_eval(&mut self, cond: &Cond<'src>) -> Result<Value> {
         // Check that this condition is actually sane.
         self.verify_cond(cond)?;
 
@@ -76,7 +76,9 @@ impl<'src> FuncTranslator<'src> {
             Cond::Lt(l, r) => self.translate_cond_comp(l, r, IntCC::SignedLessThan, FloatCC::LessThan),
 
             // Recursive conditions.
-            Cond::Not(inner) => self.translate_cond_not(inner)
+            Cond::Not(inner) => self.translate_cond_not(inner),
+            Cond::And(l, r) => self.translate_cond_and(l, r),
+            Cond::Or(l, r) => self.translate_cond_or(l, r),
         }
     }
 
@@ -117,6 +119,18 @@ impl<'src> FuncTranslator<'src> {
         Ok(self.builder.ins().bxor_imm(inner_val, 0x1))
     }
 
+    /// Translates a single combined "AND" condition into Cranelift IR, returning the generated value.
+    fn translate_cond_and(&mut self, l: &Cond<'src>, r: &Cond<'src>) -> Result<Value> {
+        let (l_val, r_val) = (self.translate_cond_eval(l)?, self.translate_cond_eval(r)?);
+        Ok(self.builder.ins().band(l_val, r_val))
+    }
+
+    /// Translates a single "OR" condition into Cranelift IR, returning the generated value.
+    fn translate_cond_or(&mut self, l: &Cond<'src>, r: &Cond<'src>) -> Result<Value> {
+        let (l_val, r_val) = (self.translate_cond_eval(l)?, self.translate_cond_eval(r)?);
+        Ok(self.builder.ins().bor(l_val, r_val))
+    }
+
     /// Verifies that the condition provided is sane, and can be computed.
     fn verify_cond(&self, cond: &Cond<'src>) -> Result<()> {
         match cond {
@@ -130,7 +144,17 @@ impl<'src> FuncTranslator<'src> {
             Cond::Lt(left, right) => self.verify_binary_ord_cmp(left, right),
 
             // Recursive conditionals.
-            Cond::Not(inner) => self.verify_cond(inner)
+            Cond::Not(inner) => self.verify_cond(inner),
+            Cond::And(l, r) => {
+                self.verify_cond(l)?;
+                self.verify_cond(r)?;
+                Ok(())
+            },
+            Cond::Or(l, r) => {
+                self.verify_cond(l)?;
+                self.verify_cond(r)?;
+                Ok(())
+            },
         }
     }
 
