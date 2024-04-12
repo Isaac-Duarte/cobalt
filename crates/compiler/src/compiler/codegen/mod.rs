@@ -17,13 +17,14 @@ use miette::Result;
 
 use crate::config::BuildConfig;
 
-use self::{data::DataManager, func::FuncTranslator, intrinsics::IntrinsicManager};
+use self::{data::DataManager, func::FuncManager, intrinsics::IntrinsicManager, translate::FuncTranslator};
 
-use super::parser::{Ast, Spanned, Stat};
+use super::parser::{Ast, Paragraph};
 
 mod data;
 mod func;
 mod intrinsics;
+mod translate;
 mod utils;
 
 /// Base code generator state.
@@ -50,6 +51,9 @@ pub struct CodeGenerator<'cfg, 'src> {
 
     /// Manages object data for this module.
     data_manager: DataManager,
+
+    /// Manages function registration for this module.
+    func_manager: FuncManager,
 }
 
 impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
@@ -79,6 +83,7 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
             module: obj_module,
             intrinsics: IntrinsicManager::new(),
             data_manager: DataManager::new(),
+            func_manager: FuncManager::new(),
         })
     }
 
@@ -88,18 +93,26 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
         let ast = self.ast.take().unwrap();
         self.data_manager.upload(&mut self.module, &ast)?;
 
+        // Define all functions.
+        for (idx, para) in ast.proc_div.paragraphs.iter().enumerate() {
+            let is_entrypoint = idx == 0;
+            self.func_manager.create_fn(&mut self.module, para.name.map(|x| x.0), is_entrypoint)?;
+        }
+
         // Translate all functions.
-        self.translate_fn("main", &ast, &ast.proc_div.stats)?;
+        for para in ast.proc_div.paragraphs.iter() {
+            self.translate_fn(para, &ast)?;
+        }
+
+        // Create an entrypoint for the program.
+        self.translate_entrypoint(&ast)?;
+
         Ok(())
     }
 
-    /// Generates a single function from the AST, given a name & list of statements.
-    fn translate_fn(
-        &mut self,
-        name: &str,
-        ast: &Ast<'src>,
-        stats: &Vec<Spanned<Stat<'src>>>,
-    ) -> Result<()> {
+    /// Generates the program entrypoint, executing paragraphs in order until a terminating
+    /// paragraph is encountered.
+    fn translate_entrypoint(&mut self, ast: &Ast<'src>) -> Result<()> {
         // Create "main" function for later linking.
         // Returns int, has no parameters.
         let int = self.module.target_config().pointer_type();
@@ -110,11 +123,78 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
         let func_id = self
             .module
             .declare_function(
-                name,
+                "main",
                 cranelift_module::Linkage::Export,
                 &self.ctx.func.signature,
             )
             .expect("Failed to declare function!");
+
+        // Create builder, begin entry block for function.
+        {
+            let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_ctx);
+            let entry_block = builder.create_block();
+            builder.append_block_params_for_function_params(entry_block);
+            builder.switch_to_block(entry_block);
+            builder.seal_block(entry_block);
+
+            // Call each paragraph in turn, until we encounter one which terminates.
+            // A terminating paragraph may be called before this, but we can't be 100% sure of that through static analysis alone,
+            // at least without some quite annoying processing. Worst case scenario, we generate some useless function calls.
+            self.func_manager.clear_refs();
+            let mut terminator_found = false;
+            for para in ast.proc_div.paragraphs.iter() {
+                let para_func_ref = match para.name {
+                    Some((name, _)) => self.func_manager.get_ref(&mut self.module, builder.func, name)?,
+                    None => self.func_manager.get_entrypoint_ref(&mut self.module, builder.func)?,
+                };
+                builder.ins().call(para_func_ref, &[]);
+
+                if para.terminates {
+                    terminator_found = true;
+                    break;
+                }
+            }
+
+            // If there was no terminator found, no "STOP RUN" statement is present anywhere in the code.
+            if !terminator_found {
+                miette::bail!("No paragraph within the program terminates execution with 'STOP RUN'.");
+            }
+
+            // Generate a return value (for now, just 0).
+            let ret_val = builder.ins().iconst(int, 0x0);
+            builder.ins().return_(&[ret_val]);
+
+            // Finish the function.
+            builder.finalize();
+        }
+
+        // Verify that the function is valid.
+        println!("{}", self.ctx.func.display());
+        verify_function(&self.ctx.func, self.module.isa())
+            .map_err(|err| miette::diagnostic!("codegen: Function verification failed: {}", err))?;
+
+        // Define the function from the built function held in ctx.
+        self.module
+            .define_function(func_id, &mut self.ctx)
+            .map_err(|err| {
+                miette::diagnostic!("codegen: Failed to define function body: {}", err)
+            })?;
+
+        self.module.clear_context(&mut self.ctx);
+        Ok(())
+    }
+
+    /// Generates a single function from the AST, given a name & list of statements.
+    fn translate_fn(
+        &mut self,
+        paragraph: &Paragraph<'src>,
+        ast: &Ast<'src>,
+    ) -> Result<()> {
+        // Fetch the function to be defined.
+        let func_id = match paragraph.name {
+            Some((name, _)) => self.func_manager.get_id(name)?,
+            None => self.func_manager.get_entrypoint_id()?
+        };
 
         // Create builder, begin entry block for function.
         {
@@ -135,12 +215,15 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
                 ast,
                 &mut self.intrinsics,
                 &mut self.data_manager,
+                &mut self.func_manager,
             );
-            trans.translate(stats)?;
+            trans.translate(&paragraph.stats)?;
 
-            // Emit the return statement (for now, 0).
-            let ret_val = trans.builder.ins().iconst(int, 0);
-            trans.builder.ins().return_(&[ret_val]);
+            // If this function terminates, emit a call to `exit()`.
+            if paragraph.terminates {
+                trans.translate_terminate()?;
+            }
+            trans.builder.ins().return_(&[]);
 
             // Finish the function.
             trans.builder.finalize();

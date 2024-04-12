@@ -5,7 +5,7 @@ use crate::compiler::{codegen::intrinsics::CobaltIntrinsic, parser::{self, Cond,
 
 use super::FuncTranslator;
 
-impl<'src> FuncTranslator<'src> {
+impl<'a, 'src> FuncTranslator<'a, 'src> {
     /// Translates a single "IF" statement to Cranelift IR.
     pub(super) fn translate_if(&mut self, if_data: &IfData<'src>) -> Result<()> {
         // If both the "IF" and "ELSE" blocks contain no statements, we can skip translating this entirely.

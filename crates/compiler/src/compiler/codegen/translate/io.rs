@@ -4,7 +4,7 @@ use miette::Result;
 
 use super::{value::CodegenLiteral, FuncTranslator};
 
-impl<'src> FuncTranslator<'src> {
+impl<'a, 'src> FuncTranslator<'a, 'src> {
     /// Generates Cranelift IR for a single "DISPLAY" statement.
     pub(super) fn translate_display(&mut self, values: &Vec<parser::Value<'src>>) -> Result<()> {
         // Print each value in order.

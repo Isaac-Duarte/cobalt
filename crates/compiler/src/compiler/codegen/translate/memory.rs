@@ -9,7 +9,7 @@ use crate::compiler::parser::{self, Literal, MoveData};
 
 use super::{value::CodegenLiteral, FuncTranslator};
 
-impl<'src> FuncTranslator<'src> {
+impl<'a, 'src> FuncTranslator<'a, 'src> {
     /// Generates Cranelift IR for a single "MOVE" statement.
     pub(super) fn translate_move(&mut self, mov_data: &MoveData) -> Result<()> {
         // Fetch the destination variable's layout.

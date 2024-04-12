@@ -23,6 +23,7 @@ pub(super) struct IntrinsicManager {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum CobaltIntrinsic {
     LibcPutchar, // int putc(char)
+    LibcExit,    // void exit(int)
     PrintStr,    // void cb_print_str(char*)
     PrintFloat,  // void cb_print_f64(f64)
     PrintInt,    // void cb_print_i64(i64)
@@ -82,6 +83,7 @@ impl IntrinsicManager {
         let mut sig = module.make_signature();
         match i {
             CobaltIntrinsic::LibcPutchar => libcputchar_sig(&mut sig),
+            CobaltIntrinsic::LibcExit => libcexit_sig(&mut sig, module),
             CobaltIntrinsic::PrintStr => printstr_sig(&mut sig, module),
             CobaltIntrinsic::PrintFloat => printfloat_sig(&mut sig),
             CobaltIntrinsic::PrintInt => printint_sig(&mut sig),
@@ -89,6 +91,7 @@ impl IntrinsicManager {
         };
         let name = match i {
             CobaltIntrinsic::LibcPutchar => "putchar",
+            CobaltIntrinsic::LibcExit => "exit",
             CobaltIntrinsic::PrintStr => "cb_print_str",
             CobaltIntrinsic::PrintFloat => "cb_print_f64",
             CobaltIntrinsic::PrintInt => "cb_print_i64",
@@ -110,6 +113,12 @@ impl IntrinsicManager {
 fn libcputchar_sig(sig: &mut Signature) {
     sig.params.push(AbiParam::new(types::I8));
     sig.returns.push(AbiParam::new(types::I32));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::LibcExit`].
+fn libcexit_sig(sig: &mut Signature, module: &mut ObjectModule) {
+    let ptr_type = module.target_config().pointer_type();
+    sig.params.push(AbiParam::new(ptr_type));
 }
 
 /// Generates a function signature for [`CobaltIntrinsic::PrintStr`].

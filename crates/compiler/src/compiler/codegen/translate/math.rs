@@ -13,7 +13,7 @@ enum BasicMathOp {
     Multiply,
 }
 
-impl<'src> FuncTranslator<'src> {
+impl<'a, 'src> FuncTranslator<'a, 'src> {
     /// Generates Cranelift IR for a single "ADD" statement.
     pub(super) fn translate_add(&mut self, op_data: &BasicMathOpData<'src>) -> Result<()> {
         self.translate_basic_op(op_data, BasicMathOp::Add)
