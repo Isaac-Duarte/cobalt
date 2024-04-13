@@ -55,7 +55,7 @@ impl<'src> Parser<'src> {
         if if_stats.is_none() && else_stats.as_ref().is_some_and(|s| s.len() > 0) {
             if_stats = else_stats;
             else_stats = None;
-            condition = Cond::Not(Box::new(condition));   
+            condition = Cond::Not(Box::new(condition));
         }
 
         self.consume_vec(&[tok![end], tok![if], tok![.], tok![eol]])?;
@@ -63,7 +63,7 @@ impl<'src> Parser<'src> {
         Ok(Stat::If(IfData {
             if_stats,
             else_stats,
-            condition
+            condition,
         }))
     }
 
@@ -88,7 +88,12 @@ impl<'src> Parser<'src> {
             tok![<=] => Cond::Le(first_op, second_op),
             tok![>=] => Cond::Ge(first_op, second_op),
             tok @ _ => {
-                parser_bail_spanned!(self, operator.1, "Unknown operator '{}' used in conditional.", tok);
+                parser_bail_spanned!(
+                    self,
+                    operator.1,
+                    "Unknown operator '{}' used in conditional.",
+                    tok
+                );
             }
         };
 
@@ -97,7 +102,7 @@ impl<'src> Parser<'src> {
             cond = match self.next()?.0 {
                 tok![and] => Cond::And(Box::new(cond), Box::new(self.parse_cond()?)),
                 tok![or] => Cond::Or(Box::new(cond), Box::new(self.parse_cond()?)),
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
 

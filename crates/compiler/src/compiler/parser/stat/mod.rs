@@ -1,6 +1,4 @@
-use super::{
-    parser_bail, token::tok, Parser, Spanned, Value
-};
+use super::{parser_bail, token::tok, Parser, Spanned, Value};
 use miette::Result;
 
 pub(crate) use cond::*;
@@ -97,7 +95,7 @@ pub(crate) enum PerformType<'src> {
     Until {
         target: &'src str,
         cond: Cond<'src>,
-        test_cond_before: bool
+        test_cond_before: bool,
     },
     Times(&'src str, Value<'src>),
     // Varying()
@@ -114,7 +112,7 @@ impl<'src> Parser<'src> {
             tok![.] => {
                 self.consume_vec(&[tok![.], tok![eol]])?;
                 PerformType::Single(first_para_txt)
-            },
+            }
 
             // PERFORM X THRU Y
             tok![thru] => {
@@ -122,7 +120,7 @@ impl<'src> Parser<'src> {
                 let end_para_tok = self.consume(tok![ident])?;
                 self.consume_vec(&[tok![.], tok![eol]])?;
                 PerformType::Thru(first_para_txt, self.text(end_para_tok))
-            },
+            }
 
             // PERFORM X UNTIL Y=Z
             tok![test_before] | tok![test_after] | tok![until] => {
@@ -131,26 +129,30 @@ impl<'src> Parser<'src> {
                     tok![test_after] => {
                         self.next()?;
                         false
-                    },
+                    }
                     tok![test_before] => {
                         self.next()?;
                         true
-                    },
+                    }
                     _ => true,
                 };
 
                 self.consume(tok![until])?;
                 let cond = self.parse_cond()?;
                 self.consume_vec(&[tok![.], tok![eol]])?;
-                PerformType::Until { target: first_para_txt, cond, test_cond_before }
-            },
+                PerformType::Until {
+                    target: first_para_txt,
+                    cond,
+                    test_cond_before,
+                }
+            }
 
             // PERFORM X Y TIMES
             tok![ident] | tok![int_lit] => {
                 let val = self.value()?;
                 self.consume_vec(&[tok![times], tok![.], tok![eol]])?;
                 PerformType::Times(first_para_txt, val)
-            },
+            }
 
             tok @ _ => {
                 self.next()?;

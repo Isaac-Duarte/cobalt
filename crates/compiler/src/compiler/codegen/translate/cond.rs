@@ -1,7 +1,13 @@
-use cranelift::codegen::ir::{condcodes::{FloatCC, IntCC}, types, InstBuilder, Value};
+use cranelift::codegen::ir::{
+    condcodes::{FloatCC, IntCC},
+    types, InstBuilder, Value,
+};
 use miette::Result;
 
-use crate::compiler::{codegen::intrinsics::CobaltIntrinsic, parser::{self, Cond, IfData}};
+use crate::compiler::{
+    codegen::intrinsics::CobaltIntrinsic,
+    parser::{self, Cond, IfData},
+};
 
 use super::FuncTranslator;
 
@@ -16,7 +22,10 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
 
         // Create blocks for the IF, ELSE and post-statement.
         let if_block = self.builder.create_block();
-        let else_block = if_data.else_stats.is_some().then(|| self.builder.create_block());
+        let else_block = if_data
+            .else_stats
+            .is_some()
+            .then(|| self.builder.create_block());
         let trailing_block = self.builder.create_block();
 
         // First, evaluate the contained condition.
@@ -24,7 +33,9 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
 
         // Run the relevant branching instruction.
         let brif_else_block = else_block.as_ref().map_or(trailing_block, |b| *b);
-        self.builder.ins().brif(cond_result, if_block, &[], brif_else_block, &[]);
+        self.builder
+            .ins()
+            .brif(cond_result, if_block, &[], brif_else_block, &[]);
 
         // Seal blocks that have had all their branch instructions defined.
         self.builder.seal_block(if_block);
@@ -70,10 +81,24 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         match cond {
             // Comparisons.
             Cond::Eq(l, r) => self.translate_cond_comp(l, r, IntCC::Equal, FloatCC::Equal),
-            Cond::Ge(l, r) => self.translate_cond_comp(l, r, IntCC::SignedGreaterThanOrEqual, FloatCC::GreaterThanOrEqual),
-            Cond::Le(l, r) => self.translate_cond_comp(l, r, IntCC::SignedLessThanOrEqual, FloatCC::LessThanOrEqual),
-            Cond::Gt(l, r) => self.translate_cond_comp(l, r, IntCC::SignedGreaterThan, FloatCC::GreaterThan),
-            Cond::Lt(l, r) => self.translate_cond_comp(l, r, IntCC::SignedLessThan, FloatCC::LessThan),
+            Cond::Ge(l, r) => self.translate_cond_comp(
+                l,
+                r,
+                IntCC::SignedGreaterThanOrEqual,
+                FloatCC::GreaterThanOrEqual,
+            ),
+            Cond::Le(l, r) => self.translate_cond_comp(
+                l,
+                r,
+                IntCC::SignedLessThanOrEqual,
+                FloatCC::LessThanOrEqual,
+            ),
+            Cond::Gt(l, r) => {
+                self.translate_cond_comp(l, r, IntCC::SignedGreaterThan, FloatCC::GreaterThan)
+            }
+            Cond::Lt(l, r) => {
+                self.translate_cond_comp(l, r, IntCC::SignedLessThan, FloatCC::LessThan)
+            }
 
             // Recursive conditions.
             Cond::Not(inner) => self.translate_cond_not(inner),
@@ -83,10 +108,16 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     }
 
     /// Translates a single comparison condition into a given value.
-    fn translate_cond_comp(&mut self, l: &parser::Value<'src>, r: &parser::Value<'src>, int_cc: IntCC, float_cc: FloatCC) -> Result<Value> {
+    fn translate_cond_comp(
+        &mut self,
+        l: &parser::Value<'src>,
+        r: &parser::Value<'src>,
+        int_cc: IntCC,
+        float_cc: FloatCC,
+    ) -> Result<Value> {
         let (mut l_val, mut r_val) = (self.load_value(l)?, self.load_value(r)?);
         let use_float_cmp = l.is_float(&self.data)? || r.is_float(&self.data)?;
-        
+
         // If the comparison requires a floating point comparison, convert both sides to float.
         if use_float_cmp {
             if !l.is_float(&self.data)? {
@@ -98,12 +129,20 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         }
 
         // Perform the comparison based on type.
-        let result = if l.is_str(&self.data)? || r.is_str(&self.data)?  {
+        let result = if l.is_str(&self.data)? || r.is_str(&self.data)? {
             // String comparison, this must be an equality. We must use our `strcmp` intrinsic.
             assert!(int_cc == IntCC::Equal && float_cc == FloatCC::Equal);
-            let strcmp = self.intrinsics.get_ref(&mut self.module, &mut self.builder.func, CobaltIntrinsic::StrCmp)?;
+            let strcmp = self.intrinsics.get_ref(
+                &mut self.module,
+                &mut self.builder.func,
+                CobaltIntrinsic::StrCmp,
+            )?;
             let inst = self.builder.ins().call(strcmp, &[l_val, r_val]);
-            *self.builder.inst_results(inst).get(0).expect("Strcmp intrinsic does not return a result.")
+            *self
+                .builder
+                .inst_results(inst)
+                .get(0)
+                .expect("Strcmp intrinsic does not return a result.")
         } else if use_float_cmp {
             self.builder.ins().fcmp(float_cc, l_val, r_val)
         } else {
@@ -149,26 +188,35 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
                 self.verify_cond(l)?;
                 self.verify_cond(r)?;
                 Ok(())
-            },
+            }
             Cond::Or(l, r) => {
                 self.verify_cond(l)?;
                 self.verify_cond(r)?;
                 Ok(())
-            },
+            }
         }
     }
 
     /// Verifies that the two values can be checked for equality.
-    fn verify_binary_eq_cmp(&self, left: &parser::Value<'src>, right: &parser::Value<'src>) -> Result<()> {
+    fn verify_binary_eq_cmp(
+        &self,
+        left: &parser::Value<'src>,
+        right: &parser::Value<'src>,
+    ) -> Result<()> {
         if (left.is_str(&self.data)? && !right.is_str(&self.data)?)
-            || (!left.is_str(&self.data)? && right.is_str(&self.data)?) {
+            || (!left.is_str(&self.data)? && right.is_str(&self.data)?)
+        {
             miette::bail!("Cannot compare a string variable to a non-string variable.");
         }
         Ok(())
     }
 
     /// Verifies that the two values can be compared ordinally.
-    fn verify_binary_ord_cmp(&self, left: &parser::Value<'src>, right: &parser::Value<'src>) -> Result<()> {
+    fn verify_binary_ord_cmp(
+        &self,
+        left: &parser::Value<'src>,
+        right: &parser::Value<'src>,
+    ) -> Result<()> {
         // String types cannot be ordinally compared.
         if left.is_str(&self.data)? || right.is_str(&self.data)? {
             miette::bail!("Cannot ordinally compare string variables.");

@@ -98,7 +98,10 @@ impl<'src> Parser<'src> {
             }
 
             // Check if we have to stop.
-            if self.peek() == tok![stop_run] || self.peek() == tok![ident] || self.peek() == tok![eof] {
+            if self.peek() == tok![stop_run]
+                || self.peek() == tok![ident]
+                || self.peek() == tok![eof]
+            {
                 break;
             }
         }
@@ -117,7 +120,7 @@ impl<'src> Parser<'src> {
         Ok(Paragraph {
             name,
             stats,
-            terminates
+            terminates,
         })
     }
 }

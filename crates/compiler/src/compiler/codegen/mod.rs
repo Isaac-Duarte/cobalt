@@ -17,7 +17,9 @@ use miette::Result;
 
 use crate::config::BuildConfig;
 
-use self::{data::DataManager, func::FuncManager, intrinsics::IntrinsicManager, translate::FuncTranslator};
+use self::{
+    data::DataManager, func::FuncManager, intrinsics::IntrinsicManager, translate::FuncTranslator,
+};
 
 use super::parser::{Ast, Paragraph};
 
@@ -96,7 +98,8 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
         // Define all functions.
         for (idx, para) in ast.proc_div.paragraphs.iter().enumerate() {
             let is_entrypoint = idx == 0;
-            self.func_manager.create_fn(&mut self.module, para.name.map(|x| x.0), is_entrypoint)?;
+            self.func_manager
+                .create_fn(&mut self.module, para.name.map(|x| x.0), is_entrypoint)?;
         }
 
         // Translate all functions.
@@ -144,8 +147,13 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
             let mut terminator_found = false;
             for para in ast.proc_div.paragraphs.iter() {
                 let para_func_ref = match para.name {
-                    Some((name, _)) => self.func_manager.get_ref(&mut self.module, builder.func, name)?,
-                    None => self.func_manager.get_entrypoint_ref(&mut self.module, builder.func)?,
+                    Some((name, _)) => {
+                        self.func_manager
+                            .get_ref(&mut self.module, builder.func, name)?
+                    }
+                    None => self
+                        .func_manager
+                        .get_entrypoint_ref(&mut self.module, builder.func)?,
                 };
                 builder.ins().call(para_func_ref, &[]);
 
@@ -157,7 +165,9 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
 
             // If there was no terminator found, no "STOP RUN" statement is present anywhere in the code.
             if !terminator_found {
-                miette::bail!("No paragraph within the program terminates execution with 'STOP RUN'.");
+                miette::bail!(
+                    "No paragraph within the program terminates execution with 'STOP RUN'."
+                );
             }
 
             // Generate a return value (for now, just 0).
@@ -185,15 +195,11 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
     }
 
     /// Generates a single function from the AST, given a name & list of statements.
-    fn translate_fn(
-        &mut self,
-        paragraph: &Paragraph<'src>,
-        ast: &Ast<'src>,
-    ) -> Result<()> {
+    fn translate_fn(&mut self, paragraph: &Paragraph<'src>, ast: &Ast<'src>) -> Result<()> {
         // Fetch the function to be defined.
         let func_id = match paragraph.name {
             Some((name, _)) => self.func_manager.get_id(name)?,
-            None => self.func_manager.get_entrypoint_id()?
+            None => self.func_manager.get_entrypoint_id()?,
         };
 
         // Create builder, begin entry block for function.

@@ -1,5 +1,9 @@
+use super::{
+    divs::{DataDiv, IdentDiv, ProcDiv},
+    token::Token,
+    Parser, StrLitStore,
+};
 use miette::Result;
-use super::{divs::{DataDiv, IdentDiv, ProcDiv}, token::Token, Parser, StrLitStore};
 
 /// Represents the overall AST of a COBOL program.
 #[derive(Debug)]
@@ -14,7 +18,7 @@ pub struct Ast<'src> {
     pub proc_div: ProcDiv<'src>,
 
     // Store of string literals used throughout the AST.
-    pub str_lits: StrLitStore
+    pub str_lits: StrLitStore,
 }
 
 impl<'src> Parser<'src> {
@@ -24,15 +28,15 @@ impl<'src> Parser<'src> {
         let ident_div = self.ident_div()?;
         let data_div = match self.peek() {
             Token::DataDiv => Some(self.data_div()?),
-            _ => None
+            _ => None,
         };
         let proc_div = self.proc_div()?;
-        
+
         Ok(Ast {
             ident_div,
             data_div,
             proc_div,
-            str_lits: self.str_lits
+            str_lits: self.str_lits,
         })
     }
 }

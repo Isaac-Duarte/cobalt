@@ -168,7 +168,9 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         // Emit the check block.
         self.switch_to_block(loop_test_block);
         let cond_val = self.translate_cond_eval(cond)?;
-        self.builder.ins().brif(cond_val, trailing_block, &[], loop_body_block, &[]);
+        self.builder
+            .ins()
+            .brif(cond_val, trailing_block, &[], loop_body_block, &[]);
 
         // Emit the body block.
         self.switch_to_block(loop_body_block);

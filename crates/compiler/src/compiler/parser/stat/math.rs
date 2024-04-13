@@ -1,6 +1,10 @@
 use miette::Result;
 
-use crate::compiler::parser::{parser_bail, token::{tok, Token}, Parser, Value};
+use crate::compiler::parser::{
+    parser_bail,
+    token::{tok, Token},
+    Parser, Value,
+};
 
 use super::Stat;
 

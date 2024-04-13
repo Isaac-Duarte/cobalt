@@ -104,14 +104,23 @@ impl FuncManager {
     }
 
     /// Returns a [`FuncRef`] for the entrypoint. This function does not utilise cache.
-    pub fn get_entrypoint_ref(&mut self, module: &mut ObjectModule, func: &mut Function) -> Result<FuncRef> {
+    pub fn get_entrypoint_ref(
+        &mut self,
+        module: &mut ObjectModule,
+        func: &mut Function,
+    ) -> Result<FuncRef> {
         let ep_id = self.get_entrypoint_id()?;
         Ok(module.declare_func_in_func(ep_id, func))
     }
 
     /// Retrieves a [`FuncRef`] for the paragraph of the given name, using cache when available.
     /// If a paragraph with that name has not been registered, returns an error.
-    pub fn get_ref(&mut self, module: &mut ObjectModule, func: &mut Function, name: &str) -> Result<FuncRef> {
+    pub fn get_ref(
+        &mut self,
+        module: &mut ObjectModule,
+        func: &mut Function,
+        name: &str,
+    ) -> Result<FuncRef> {
         if self.ref_map.contains_key(name) {
             return Ok(self.ref_map.get(name).unwrap().clone());
         }

@@ -1,12 +1,19 @@
 use crate::compiler::parser::{Ast, Spanned, Stat};
-use cranelift::{codegen::ir::{Block, InstBuilder}, frontend::FunctionBuilder};
+use cranelift::{
+    codegen::ir::{Block, InstBuilder},
+    frontend::FunctionBuilder,
+};
 use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 use miette::Result;
 
 use self::value::ValueCache;
 
-use super::{data::DataManager, func::FuncManager, intrinsics::{CobaltIntrinsic, IntrinsicManager}};
+use super::{
+    data::DataManager,
+    func::FuncManager,
+    intrinsics::{CobaltIntrinsic, IntrinsicManager},
+};
 
 mod cond;
 mod control;
@@ -76,7 +83,11 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     /// Generates Cranelift IR for a program termination.
     /// Required for paragraphs which unconditionally terminate the program (e.g. with `STOP RUN`).
     pub fn translate_terminate(&mut self) -> Result<()> {
-        let libc_exit = self.intrinsics.get_ref(self.module, &mut self.builder.func, CobaltIntrinsic::LibcExit)?;
+        let libc_exit = self.intrinsics.get_ref(
+            self.module,
+            &mut self.builder.func,
+            CobaltIntrinsic::LibcExit,
+        )?;
         let ptr_type = self.module.target_config().pointer_type();
         let exit_code = self.builder.ins().iconst(ptr_type, 0x0);
         self.builder.ins().call(libc_exit, &[exit_code]);
