@@ -9,6 +9,7 @@ use self::value::ValueCache;
 use super::{data::DataManager, func::FuncManager, intrinsics::{CobaltIntrinsic, IntrinsicManager}};
 
 mod cond;
+mod control;
 mod io;
 mod math;
 mod memory;
@@ -92,6 +93,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             Stat::Multiply(op_data) => self.translate_multiply(op_data)?,
             Stat::Divide(div_data) => self.translate_divide(div_data)?,
             Stat::If(if_data) => self.translate_if(if_data)?,
+            Stat::Perform(perform) => self.translate_perform(perform)?,
         }
         Ok(())
     }

@@ -32,6 +32,12 @@ macro_rules! tok {
     [not] => { $crate::compiler::parser::Token::Not };
     [and] => { $crate::compiler::parser::Token::And };
     [or] => { $crate::compiler::parser::Token::Or };
+    [perform] => { $crate::compiler::parser::Token::Perform };
+    [until] => { $crate::compiler::parser::Token::Until };
+    [test_before] => { $crate::compiler::parser::Token::WithTestBefore };
+    [test_after] => { $crate::compiler::parser::Token::WithTestAfter };
+    [thru] => { $crate::compiler::parser::Token::Thru };
+    [times] => { $crate::compiler::parser::Token::Times };
     [=] => { $crate::compiler::parser::Token::Equals };
     [<=] => { $crate::compiler::parser::Token::LessThanEqual };
     [>=] => { $crate::compiler::parser::Token::GreaterThanEqual };
@@ -156,6 +162,18 @@ pub(crate) enum Token {
     And,
     #[token("OR", priority = 5)]
     Or,
+    #[token("PERFORM")]
+    Perform,
+    #[token("UNTIL")]
+    Until,
+    #[token("WITH TEST BEFORE")]
+    WithTestBefore,
+    #[token("WITH TEST AFTER")]
+    WithTestAfter,
+    #[token("THRU")]
+    Thru,
+    #[token("TIMES")]
+    Times,
     #[token("=")]
     Equals,
     #[token("<=")]
@@ -222,6 +240,12 @@ impl Display for Token {
             Token::Not => write!(f, "NOT"),
             Token::And => write!(f, "AND"),
             Token::Or => write!(f, "OR"),
+            Token::Perform => write!(f, "PERFORM"),
+            Token::Until => write!(f, "UNTIL"),
+            Token::WithTestBefore => write!(f, "WITH TEST BEFORE"),
+            Token::WithTestAfter => write!(f, "WITH TEST AFTER"),
+            Token::Thru => write!(f, "THRU"),
+            Token::Times => write!(f, "TIMES"),
             Token::Equals => write!(f, "="),
             Token::LessThanEqual => write!(f, "<="),
             Token::GreaterThanEqual => write!(f, ">="),

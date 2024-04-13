@@ -35,8 +35,6 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         op_data: &BasicMathOpData<'src>,
         op_type: BasicMathOp,
     ) -> Result<()> {
-        println!("{:#?}", op_data);
-
         // Verify this instruction is sane.
         self.verify_basic_op_data(op_data)?;
 

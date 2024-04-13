@@ -91,6 +91,13 @@ impl<'src> Parser<'src> {
         let mut stats: Vec<Spanned<Stat<'src>>> = Vec::new();
         loop {
             stats.push(self.stat()?);
+
+            // Consume any lines between statements, we don't care about those.
+            while self.peek() == tok![eol] {
+                self.next()?;
+            }
+
+            // Check if we have to stop.
             if self.peek() == tok![stop_run] || self.peek() == tok![ident] || self.peek() == tok![eof] {
                 break;
             }
