@@ -105,6 +105,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             Stat::Divide(div_data) => self.translate_divide(div_data)?,
             Stat::If(if_data) => self.translate_if(if_data)?,
             Stat::Perform(perform) => self.translate_perform(perform)?,
+            Stat::Accept(target) => self.translate_accept(target)?,
         }
         Ok(())
     }

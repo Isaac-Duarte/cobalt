@@ -15,3 +15,4 @@ panic = "abort"
 [dependencies]
 libc = "0.2.153"
 libc-print = "0.1.22"
+libc_alloc = "1.0.7"

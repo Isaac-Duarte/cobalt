@@ -28,6 +28,9 @@ pub(super) enum CobaltIntrinsic {
     PrintFloat,  // void cb_print_f64(f64)
     PrintInt,    // void cb_print_i64(i64)
     StrCmp,      // i8 cb_strcmp(char*, char*)
+    ReadStr,     // void cb_readstr(char*, usize)
+    ReadInt,     // i64 cb_readint()
+    ReadFloat,   // f64 cb_readfloat()
 }
 
 impl IntrinsicManager {
@@ -88,6 +91,9 @@ impl IntrinsicManager {
             CobaltIntrinsic::PrintFloat => printfloat_sig(&mut sig),
             CobaltIntrinsic::PrintInt => printint_sig(&mut sig),
             CobaltIntrinsic::StrCmp => strcmp_sig(&mut sig, module),
+            CobaltIntrinsic::ReadStr => readstr_sig(&mut sig, module),
+            CobaltIntrinsic::ReadInt => readint_sig(&mut sig),
+            CobaltIntrinsic::ReadFloat => readfloat_sig(&mut sig),
         };
         let name = match i {
             CobaltIntrinsic::LibcPutchar => "putchar",
@@ -96,6 +102,9 @@ impl IntrinsicManager {
             CobaltIntrinsic::PrintFloat => "cb_print_f64",
             CobaltIntrinsic::PrintInt => "cb_print_i64",
             CobaltIntrinsic::StrCmp => "cb_strcmp",
+            CobaltIntrinsic::ReadStr => "cb_readstr",
+            CobaltIntrinsic::ReadInt => "cb_readint",
+            CobaltIntrinsic::ReadFloat => "cb_readfloat",
         };
 
         // Import it.
@@ -143,4 +152,21 @@ fn strcmp_sig(sig: &mut Signature, module: &mut ObjectModule) {
     sig.params.push(AbiParam::new(ptr_type));
     sig.params.push(AbiParam::new(ptr_type));
     sig.returns.push(AbiParam::new(types::I8));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::ReadStr`].
+fn readstr_sig(sig: &mut Signature, module: &mut ObjectModule) {
+    let ptr_type = module.target_config().pointer_type();
+    sig.params.push(AbiParam::new(ptr_type));
+    sig.params.push(AbiParam::new(ptr_type));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::ReadInt`].
+fn readint_sig(sig: &mut Signature) {
+    sig.returns.push(AbiParam::new(types::I64));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::ReadFloat`].
+fn readfloat_sig(sig: &mut Signature) {
+    sig.returns.push(AbiParam::new(types::F64));
 }

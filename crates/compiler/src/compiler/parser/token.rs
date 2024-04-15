@@ -38,6 +38,7 @@ macro_rules! tok {
     [test_after] => { $crate::compiler::parser::Token::WithTestAfter };
     [thru] => { $crate::compiler::parser::Token::Thru };
     [times] => { $crate::compiler::parser::Token::Times };
+    [accept] => { $crate::compiler::parser::Token::Accept };
     [=] => { $crate::compiler::parser::Token::Equals };
     [<=] => { $crate::compiler::parser::Token::LessThanEqual };
     [>=] => { $crate::compiler::parser::Token::GreaterThanEqual };
@@ -174,6 +175,8 @@ pub(crate) enum Token {
     Thru,
     #[token("TIMES")]
     Times,
+    #[token("ACCEPT")]
+    Accept,
     #[token("=")]
     Equals,
     #[token("<=")]
@@ -246,6 +249,7 @@ impl Display for Token {
             Token::WithTestAfter => write!(f, "WITH TEST AFTER"),
             Token::Thru => write!(f, "THRU"),
             Token::Times => write!(f, "TIMES"),
+            Token::Accept => write!(f, "ACCEPT"),
             Token::Equals => write!(f, "="),
             Token::LessThanEqual => write!(f, "<="),
             Token::GreaterThanEqual => write!(f, ">="),

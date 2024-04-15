@@ -1,5 +1,8 @@
 #![no_std]
+extern crate alloc;
+use alloc::string::String;
 use core::ffi::{c_char, CStr};
+use libc_alloc::LibcAlloc;
 use libc_print::std_name::print;
 
 /// This is a horrible hack.
@@ -15,6 +18,10 @@ extern "C" fn rust_eh_personality() {}
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "C" fn _Unwind_Resume() {}
+
+/// The allocator to use for this library.
+#[global_allocator]
+static ALLOCATOR: LibcAlloc = LibcAlloc;
 
 /// Panic handler for the intrinsics crate.
 #[cfg(not(test))]
@@ -61,4 +68,58 @@ pub unsafe extern "C" fn cb_strcmp(str_a: *const c_char, str_b: *const c_char) -
     } else {
         0
     }
+}
+
+/// Reads a single line from the console, copying the data into the given buffer.
+/// The length of this buffer must be provided.
+#[no_mangle]
+pub unsafe extern "C" fn cb_readstr(buf: *mut c_char, buf_len: usize) {
+    let input = cb_readline();
+    if input.len() >= buf_len {
+        panic!(
+            "Input string was too long for string buffer ({} > {})",
+            input.len() + 1,
+            buf_len
+        );
+    }
+    let input_bytes = input.as_bytes();
+    let input_ptr = input_bytes.as_ptr();
+
+    // Safety: This is only valid because our string lives until the end of the function.
+    core::ptr::copy_nonoverlapping(input_ptr, buf.cast(), input_bytes.len());
+    // Add our null terminator.
+    *buf.add(input.len()) = b'\0' as _;
+}
+
+/// Reads a single integer from the console, returning the result.
+/// On failure to parse, panics.
+#[no_mangle]
+pub unsafe extern "C" fn cb_readint() -> i64 {
+    let input = cb_readline();
+    input
+        .parse::<i64>()
+        .expect("Invalid integer, could not parse.")
+}
+
+/// Reads a single floating point number from the console, returning the result.
+/// On failure to parse, panics.
+#[no_mangle]
+pub unsafe extern "C" fn cb_readfloat() -> f64 {
+    let input = cb_readline();
+    input
+        .parse::<f64>()
+        .expect("Invalid float, could not parse.")
+}
+
+/// Reads a single owned line from the console, returning it.
+unsafe fn cb_readline() -> String {
+    let mut input = String::new();
+    loop {
+        let cur_char = char::from_u32(libc::getchar() as u32).expect("Invalid char code.");
+        if cur_char == '\n' {
+            break;
+        }
+        input.push(cur_char);
+    }
+    input
 }

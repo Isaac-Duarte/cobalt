@@ -18,6 +18,7 @@ pub(crate) enum Stat<'src> {
     Divide(DivideData<'src>),
     If(IfData<'src>),
     Perform(PerformType<'src>),
+    Accept(&'src str),
 }
 
 impl<'src> Parser<'src> {
@@ -33,6 +34,7 @@ impl<'src> Parser<'src> {
             tok![divide] => self.parse_divide()?,
             tok![if] => self.parse_if()?,
             tok![perform] => self.parse_perform()?,
+            tok![accept] => self.parse_accept()?,
 
             // Unknown token.
             tok @ _ => {
@@ -63,6 +65,14 @@ impl<'src> Parser<'src> {
         self.consume_vec(&[tok![.], tok![eol]])?;
 
         Ok(Stat::Display(to_display))
+    }
+
+    /// Parses a single "ACCEPT" statement from the current position.
+    fn parse_accept(&mut self) -> Result<Stat<'src>> {
+        self.consume(tok![accept])?;
+        let ident_tok = self.consume(tok![ident])?;
+        self.consume_vec(&[tok![.], tok![eol]])?;
+        Ok(Stat::Accept(self.text(ident_tok)))
     }
 }
 
