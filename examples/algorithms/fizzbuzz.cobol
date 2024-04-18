@@ -1,0 +1,36 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. FIZZ-BUZZ.
+
+DATA DIVISION.
+    WORKING-STORAGE SECTION.
+    01 MAX-VAL PIC 9(4) COMP.
+    01 CUR-VAL PIC 9(4) COMP VALUE 1.
+    01 MOD-RESULT PIC 9(4) COMP.
+    01 FIZZ PIC X(4).
+    01 BUZZ PIC X(4).
+
+PROCEDURE DIVISION.
+    DISPLAY "Please enter a maximum value.".
+    ACCEPT MAX-VAL.
+    PERFORM FIZZ-BUZZ-ROUND UNTIL CUR-VAL > MAX-VAL.
+    STOP RUN.
+
+    FIZZ-BUZZ-ROUND.
+    MOVE "" TO FIZZ.
+    MOVE "" TO BUZZ.
+
+    // Check if this result is "fizz".
+    MOVE FUNCTION MOD(CUR-VAL, 3) TO MOD-RESULT.
+    IF MOD-RESULT = 0 THEN
+        MOVE "Fizz" TO FIZZ.
+    END IF.
+
+    // Check if this result is "buzz".
+    MOVE FUNCTION MOD(CUR-VAL, 5) TO MOD-RESULT.
+    IF MOD-RESULT = 0 THEN
+        MOVE "Buzz" TO BUZZ.
+    END IF.
+
+    // Output this round, increment.
+    DISPLAY CUR-VAL " - " FIZZ BUZZ.
+    ADD 1 TO CUR-VAL.
