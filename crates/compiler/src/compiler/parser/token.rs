@@ -39,12 +39,16 @@ macro_rules! tok {
     [thru] => { $crate::compiler::parser::Token::Thru };
     [times] => { $crate::compiler::parser::Token::Times };
     [accept] => { $crate::compiler::parser::Token::Accept };
+    [function] => { $crate::compiler::parser::Token::Function };
     [=] => { $crate::compiler::parser::Token::Equals };
     [<=] => { $crate::compiler::parser::Token::LessThanEqual };
     [>=] => { $crate::compiler::parser::Token::GreaterThanEqual };
     [<] => { $crate::compiler::parser::Token::LessThan };
     [>] => { $crate::compiler::parser::Token::GreaterThan };
     [.] => { $crate::compiler::parser::Token::CtrlDot };
+    [open_par] => { $crate::compiler::parser::Token::OpenParentheses };
+    [close_par] => { $crate::compiler::parser::Token::CloseParentheses };
+    [,] => { $crate::compiler::parser::Token::Comma };
     [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
     [int_lit] => { $crate::compiler::parser::Token::IntLiteral };
     [str_literal] => { $crate::compiler::parser::Token::StringLiteral };
@@ -109,6 +113,7 @@ impl<'src> Iterator for Lexer<'src> {
 /// Represents a single COBOL token.
 #[derive(Logos, Debug, Copy, Clone, PartialEq)]
 pub(crate) enum Token {
+    // Keywords.
     #[token("IDENTIFICATION DIVISION")]
     IdentDiv,
     #[token("DATA DIVISION")]
@@ -177,6 +182,10 @@ pub(crate) enum Token {
     Times,
     #[token("ACCEPT")]
     Accept,
+    #[token("FUNCTION")]
+    Function,
+
+    // Symbols & regex tokens.
     #[token("=")]
     Equals,
     #[token("<=")]
@@ -189,6 +198,12 @@ pub(crate) enum Token {
     GreaterThan,
     #[token(".")]
     CtrlDot,
+    #[token("(")]
+    OpenParentheses,
+    #[token(")")]
+    CloseParentheses,
+    #[token(",")]
+    Comma,
     #[regex(r#"(-)?[0-9]+\.[0-9]+"#)]
     FloatLiteral,
     #[regex(r#"(-)?[0-9]+"#, priority = 5)]
@@ -250,12 +265,16 @@ impl Display for Token {
             Token::Thru => write!(f, "THRU"),
             Token::Times => write!(f, "TIMES"),
             Token::Accept => write!(f, "ACCEPT"),
+            Token::Function => write!(f, "FUNCTION"),
             Token::Equals => write!(f, "="),
             Token::LessThanEqual => write!(f, "<="),
             Token::GreaterThanEqual => write!(f, ">="),
             Token::LessThan => write!(f, "<"),
             Token::GreaterThan => write!(f, ">"),
             Token::CtrlDot => write!(f, "."),
+            Token::OpenParentheses => write!(f, "("),
+            Token::CloseParentheses => write!(f, ")"),
+            Token::Comma => write!(f, ","),
             Token::FloatLiteral => write!(f, "float-literal"),
             Token::IntLiteral => write!(f, "int-literal"),
             Token::StringLiteral => write!(f, "string-literal"),

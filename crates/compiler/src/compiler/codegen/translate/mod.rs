@@ -17,6 +17,7 @@ use super::{
 
 mod cond;
 mod control;
+mod intrinsics;
 mod io;
 mod math;
 mod memory;

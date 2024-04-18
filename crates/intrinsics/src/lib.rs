@@ -123,3 +123,10 @@ unsafe fn cb_readline() -> String {
     }
     input
 }
+
+/// COBOL modulus intrinsic.
+/// Performs a modulus operation on two integers.
+#[no_mangle]
+pub unsafe extern "C" fn cb_mod(a: i64, b: i64) -> i64 {
+    a % b
+}

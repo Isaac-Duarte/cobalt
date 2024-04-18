@@ -5,37 +5,71 @@ use cranelift::{
 use cranelift_module::{DataId, Module};
 use miette::Result;
 
-use crate::compiler::parser::{self, Literal, MoveData};
+use crate::compiler::parser::{self, IntrinsicCall, Literal, MoveData, MoveSource};
 
 use super::{value::CodegenLiteral, FuncTranslator};
 
 impl<'a, 'src> FuncTranslator<'a, 'src> {
     /// Generates Cranelift IR for a single "MOVE" statement.
-    pub(super) fn translate_move(&mut self, mov_data: &MoveData) -> Result<()> {
+    pub(super) fn translate_move(&mut self, mov_data: &MoveData<'src>) -> Result<()> {
+        match &mov_data.source {
+            MoveSource::Intrinsic(ic_call) => self.translate_move_intrinsic(ic_call, mov_data.dest),
+            MoveSource::Value(val) => self.translate_move_value(val, mov_data.dest)
+        }
+    }
+
+    /// Generates Cranelift IR for a single move instruction resulting from an intrinsic call.
+    fn translate_move_intrinsic(&mut self, call: &IntrinsicCall<'src>, dest: &'src str) -> Result<()> {
+        // Translate the intrinsic call, load a pointer to the destination.
+        let (ret_val, ret_type) = self.translate_intrinsic_call(call)?;
+        let dest_ptr = self.load_static_ptr(self.data.sym_data_id(dest)?)?;
+
+        // Determine whether the output type of that intrinsic call is valid for the destination.
+        let dest_pic = self.data.sym_pic(dest)?;
+        let ptr_type = self.module.target_config().pointer_type();
+        if dest_pic.is_float() && ret_type != types::F64
+            || dest_pic.is_str() && ret_type != ptr_type
+            || !dest_pic.is_float() && !dest_pic.is_str() && ret_type != types::I64 {
+            miette::bail!("Invalid destination for the return type of intrinsic function '{}'.", call.name);
+        }
+
+        // Perform a store of the value.
+        if dest_pic.is_float() || (!dest_pic.is_float() && !dest_pic.is_str()) {
+            self.builder
+                .ins()
+                .store(MemFlags::new(), ret_val, dest_ptr, Offset32::new(0));
+        } else {
+            miette::bail!("String copy intrinsics are currently unimplemented.");
+        }
+        Ok(())
+    }
+
+    /// Generates Cranelift IR for a single move resulting from a [`parser::Value`].
+    fn translate_move_value(&mut self, source: &parser::Value<'src>, dest: &'src str) -> Result<()> {
         // Fetch the destination variable's layout.
-        let dest_pic = self.data.sym_pic(mov_data.dest)?;
+        let dest_pic = self.data.sym_pic(dest)?;
 
         // Move based on the source, either a literal/variable.
         // We also verify here whether the source properly matches the destination.
-        match &mov_data.source {
+        match &source {
             parser::Value::Literal(lit) => {
                 if !dest_pic.verify_lit(&self.ast.str_lits, lit) {
                     miette::bail!(
                     "Attempted to move incompatible literal '{}' into variable '{}' ({} bytes).",
                     lit.text(&self.ast.str_lits),
-                    mov_data.dest,
+                    dest,
                     dest_pic.comp_size()
                 );
                 }
-                self.translate_mov_lit(lit, mov_data.dest)?;
+                self.translate_mov_lit(lit, dest)?;
             }
             parser::Value::Variable(sym) => {
                 let source_pic = self.data.sym_pic(sym)?;
                 if !source_pic.fits_within_comp(dest_pic) {
                     miette::bail!("Attempted to move incompatible variable '{}' ({} bytes) into variable '{}' ({} bytes).",
-                    sym, source_pic.comp_size(), mov_data.dest, dest_pic.comp_size());
+                    sym, source_pic.comp_size(), dest, dest_pic.comp_size());
                 }
-                self.translate_mov_var(sym, mov_data.dest)?;
+                self.translate_mov_var(sym, dest)?;
             }
         }
         Ok(())

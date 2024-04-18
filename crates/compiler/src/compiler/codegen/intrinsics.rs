@@ -31,6 +31,7 @@ pub(super) enum CobaltIntrinsic {
     ReadStr,     // void cb_readstr(char*, usize)
     ReadInt,     // i64 cb_readint()
     ReadFloat,   // f64 cb_readfloat()
+    Mod,         // i64 cb_mod(i64, i64)
 }
 
 impl IntrinsicManager {
@@ -40,6 +41,21 @@ impl IntrinsicManager {
             funcs: HashMap::new(),
             refs: HashMap::new(),
         }
+    }
+
+    /// Resolves the given COBOL intrinsic name into a known [`CobaltIntrinsic`].
+    /// On failure to resolve an intrinsic with the given name, returns an error.
+    pub fn resolve_name(&self, name: &str) -> Result<CobaltIntrinsic> {
+        let intrinsic = match name {
+            "MOD" => CobaltIntrinsic::Mod,
+            unk @ _ => {
+                miette::bail!(
+                    "Unknown/unimplemented intrinsic '{}' was attempted to be resolved.",
+                    unk
+                );
+            }
+        };
+        Ok(intrinsic)
     }
 
     /// Returns a function reference for the given Cobalt intrinsic.
@@ -73,16 +89,8 @@ impl IntrinsicManager {
         self.refs.clear();
     }
 
-    /// Attempts to import the given intrinsic into the current module.
-    fn import_intrinsic(
-        &mut self,
-        module: &mut ObjectModule,
-        i: CobaltIntrinsic,
-    ) -> Result<&FuncId> {
-        // Sanity check.
-        assert!(!self.funcs.contains_key(&i));
-
-        // Get the function signature, name.
+    /// Fetches the function signature for the given [`CobaltIntrinsic`].
+    pub fn get_signature(&mut self, module: &mut ObjectModule, i: CobaltIntrinsic) -> Signature {
         let mut sig = module.make_signature();
         match i {
             CobaltIntrinsic::LibcPutchar => libcputchar_sig(&mut sig),
@@ -94,7 +102,22 @@ impl IntrinsicManager {
             CobaltIntrinsic::ReadStr => readstr_sig(&mut sig, module),
             CobaltIntrinsic::ReadInt => readint_sig(&mut sig),
             CobaltIntrinsic::ReadFloat => readfloat_sig(&mut sig),
+            CobaltIntrinsic::Mod => mod_sig(&mut sig),
         };
+        sig
+    }
+
+    /// Attempts to import the given intrinsic into the current module.
+    fn import_intrinsic(
+        &mut self,
+        module: &mut ObjectModule,
+        i: CobaltIntrinsic,
+    ) -> Result<&FuncId> {
+        // Sanity check.
+        assert!(!self.funcs.contains_key(&i));
+
+        // Get the function signature, name.
+        let sig = self.get_signature(module, i);
         let name = match i {
             CobaltIntrinsic::LibcPutchar => "putchar",
             CobaltIntrinsic::LibcExit => "exit",
@@ -105,6 +128,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::ReadStr => "cb_readstr",
             CobaltIntrinsic::ReadInt => "cb_readint",
             CobaltIntrinsic::ReadFloat => "cb_readfloat",
+            CobaltIntrinsic::Mod => "cb_mod",
         };
 
         // Import it.
@@ -169,4 +193,11 @@ fn readint_sig(sig: &mut Signature) {
 /// Generates a function signature for [`CobaltIntrinsic::ReadFloat`].
 fn readfloat_sig(sig: &mut Signature) {
     sig.returns.push(AbiParam::new(types::F64));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::Mod`].
+fn mod_sig(sig: &mut Signature) {
+    sig.params.push(AbiParam::new(types::I64));
+    sig.params.push(AbiParam::new(types::I64));
+    sig.returns.push(AbiParam::new(types::I64));
 }

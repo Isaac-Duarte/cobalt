@@ -2,9 +2,11 @@ use super::{parser_bail, token::tok, Parser, Spanned, Value};
 use miette::Result;
 
 pub(crate) use cond::*;
+pub(crate) use intrinsics::*;
 pub(crate) use math::*;
 
 mod cond;
+mod intrinsics;
 mod math;
 
 /// Represents a single executable statement within a COBOL program.
@@ -79,15 +81,31 @@ impl<'src> Parser<'src> {
 /// Data for a single "MOVE" instruction, from one source to one destination.
 #[derive(Debug)]
 pub(crate) struct MoveData<'src> {
-    pub source: Value<'src>,
+    pub source: MoveSource<'src>,
     pub dest: &'src str,
+}
+
+/// All available sources for a MOVE instruction.
+#[derive(Debug)]
+pub(crate) enum MoveSource<'src> {
+    Value(Value<'src>),
+    Intrinsic(IntrinsicCall<'src>),
 }
 
 impl<'src> Parser<'src> {
     /// Parses a single "MOVE" statement from the current position.
     fn parse_move(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![move])?;
-        let source = self.value()?;
+
+        // Parse the source.
+        let source = if self.peek() == tok![function] {
+            self.next()?;
+            MoveSource::Intrinsic(self.intrinsic_call()?)
+        } else {
+            MoveSource::Value(self.value()?)
+        };
+
+        // Parse the destination.
         self.consume(tok![to])?;
         let dest_tok = self.consume(tok![ident])?;
         let dest = &self.text(dest_tok);
