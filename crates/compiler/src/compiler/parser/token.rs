@@ -49,6 +49,7 @@ macro_rules! tok {
     [open_par] => { $crate::compiler::parser::Token::OpenParentheses };
     [close_par] => { $crate::compiler::parser::Token::CloseParentheses };
     [,] => { $crate::compiler::parser::Token::Comma };
+    [:] => { $crate::compiler::parser::Token::Colon };
     [float_lit] => { $crate::compiler::parser::Token::FloatLiteral };
     [int_lit] => { $crate::compiler::parser::Token::IntLiteral };
     [str_literal] => { $crate::compiler::parser::Token::StringLiteral };
@@ -204,6 +205,8 @@ pub(crate) enum Token {
     CloseParentheses,
     #[token(",")]
     Comma,
+    #[token(":")]
+    Colon,
     #[regex(r#"(-)?[0-9]+\.[0-9]+"#)]
     FloatLiteral,
     #[regex(r#"(-)?[0-9]+"#, priority = 5)]
@@ -275,6 +278,7 @@ impl Display for Token {
             Token::OpenParentheses => write!(f, "("),
             Token::CloseParentheses => write!(f, ")"),
             Token::Comma => write!(f, ","),
+            Token::Colon => write!(f, ":"),
             Token::FloatLiteral => write!(f, "float-literal"),
             Token::IntLiteral => write!(f, "int-literal"),
             Token::StringLiteral => write!(f, "string-literal"),

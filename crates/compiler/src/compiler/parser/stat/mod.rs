@@ -1,4 +1,4 @@
-use super::{parser_bail, token::tok, Parser, Spanned, Value};
+use super::{parser_bail, token::tok, Literal, Parser, Spanned, Value};
 use miette::Result;
 
 pub(crate) use cond::*;
@@ -82,14 +82,34 @@ impl<'src> Parser<'src> {
 #[derive(Debug)]
 pub(crate) struct MoveData<'src> {
     pub source: MoveSource<'src>,
-    pub dest: &'src str,
+    pub dest: MoveRef<'src>,
 }
 
 /// All available sources for a MOVE instruction.
 #[derive(Debug)]
 pub(crate) enum MoveSource<'src> {
-    Value(Value<'src>),
+    MoveRef(MoveRef<'src>),
+    Literal(Literal),
     Intrinsic(IntrinsicCall<'src>),
+}
+
+/// Represents a single spanned source or destination for a referenced MOVE instruction.
+/// Used for allowing substring accesses and moves for PIC X(N) variables.
+#[derive(Debug)]
+pub(crate) struct MoveRef<'src> {
+    /// The underyling variable for this move reference.
+    pub sym: &'src str,
+
+    /// The span of this variable that is targeted, if specified.
+    /// This is only valid on variables of type PIC X(N), and is verified at code generation.
+    pub span: Option<MoveSpan>,
+}
+
+/// A single target span within a move reference variable.
+#[derive(Debug)]
+pub(crate) struct MoveSpan {
+    pub start_idx: usize,
+    pub len: usize,
 }
 
 impl<'src> Parser<'src> {
@@ -102,16 +122,47 @@ impl<'src> Parser<'src> {
             self.next()?;
             MoveSource::Intrinsic(self.intrinsic_call()?)
         } else {
-            MoveSource::Value(self.value()?)
+            let value = self.value()?;
+            match value {
+                Value::Literal(lit) => MoveSource::Literal(lit),
+                Value::Variable(sym) => {
+                    // There may be a span specified, check.
+                    let span = (self.peek() == tok![open_par]).then(|| self.parse_span()).transpose()?;
+                    MoveSource::MoveRef(MoveRef { sym, span })
+                }
+            }
         };
 
         // Parse the destination.
         self.consume(tok![to])?;
         let dest_tok = self.consume(tok![ident])?;
-        let dest = &self.text(dest_tok);
+        let sym = &self.text(dest_tok);
+        let span = (self.peek() == tok![open_par]).then(|| self.parse_span()).transpose()?;
+        let dest = MoveRef { sym, span };
         self.consume_vec(&[tok![.], tok![eol]])?;
 
         Ok(Stat::Move(MoveData { source, dest }))
+    }
+
+    /// Parses a single [`MoveSpan`] from the current position.
+    fn parse_span(&mut self) -> Result<MoveSpan> {
+        // Consume (S, E).
+        self.consume(tok![open_par])?;
+        let start_idx = self.consume_int()?;
+        self.consume(tok![:])?;
+        let len = self.consume_int()?;
+        self.consume(tok![close_par])?;
+
+        // Check that the indices provided make some sort of sense.
+        // We can't test them against the referenced symbol here, just a basic sanity check.
+        if start_idx < 0 {
+            parser_bail!(self, "Invalid start index {} (<0) provided for span.", start_idx);
+        }
+        if len < 1 {
+            parser_bail!(self, "Invalid length {} provided for span, must be >= 1.", len);
+        }
+
+        Ok(MoveSpan { start_idx: start_idx as usize, len: len as usize })
     }
 }
 

@@ -103,6 +103,7 @@ impl DataManager {
                 }
                 None => {
                     // No initial value, so declare as zeroed out.
+                    // We require this behaviour as strings can be arbitrarily partly copied as substrings.
                     desc.define_zeroinit(elem_var.pic.comp_size());
                 }
             }
