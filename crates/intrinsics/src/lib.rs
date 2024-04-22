@@ -70,6 +70,66 @@ pub unsafe extern "C" fn cb_strcmp(str_a: *const c_char, str_b: *const c_char) -
     }
 }
 
+/// Copies a portion of the given source string into the destination string.
+/// Panics if the source or destination span are invalid.
+/// If the source span does not fit within the destination span, the source is truncated upon copy.
+#[no_mangle]
+pub unsafe extern "C" fn cb_strcpy(
+    src_str: *const c_char,
+    dest_str: *mut c_char,
+    src_len: i64,
+    dest_len: i64,
+    src_span_idx: i64,
+    src_span_len: i64,
+    dest_span_idx: i64,
+    dest_span_len: i64,
+) {
+    // Length sanity check.
+    if src_span_idx < 0 || dest_span_idx < 0 || src_span_len < 1 || dest_span_len < 1 {
+        panic!(
+            "Source ({}:{}) or destination ({}:{}) spans contain out of bounds accesses or are zero-copy.",
+            src_span_idx, src_span_len, dest_span_idx, dest_span_len
+        );
+    }
+
+    // Verify the source span is valid within the source, destination span is valid within destination.
+    if src_span_idx + src_span_len > src_len {
+        panic!(
+            "Source span ({}:{}) out of bounds for given source string ({} bytes).",
+            src_span_idx, src_span_len, src_len
+        );
+    }
+    if dest_span_idx + dest_span_len > dest_len {
+        panic!(
+            "Destination span ({}:{}) out of bounds for given destination string ({} bytes).",
+            dest_span_idx, dest_span_len, dest_len
+        );
+    }
+
+    // The destination string may currently have garbage post-terminator data before our index.
+    // If that's the case, we need to overwrite it with spaces.
+    let dest_cstr: &CStr = unsafe { CStr::from_ptr(dest_str) };
+    let dest_slice: &str = dest_cstr.to_str().unwrap();
+    if dest_slice.len() < src_span_idx as usize {
+        libc::memset(
+            dest_str.add(dest_slice.len()).cast(),
+            (' ' as u8) as i32,
+            src_span_idx as usize - dest_slice.len(),
+        );
+    }
+
+    // Calculate the pointer offset for source, destination & size.
+    let src_ptr = src_str.add(src_span_idx as usize);
+    let dest_ptr = dest_str.add(dest_span_idx as usize);
+    let size = core::cmp::min(src_span_len, dest_span_len) as usize;
+
+    // Perform copy (possibly overlapping).
+    core::ptr::copy(src_ptr, dest_ptr, size);
+
+    // Add a null terminator.
+    *dest_ptr.add(size) = b'\0' as _;
+}
+
 /// Reads a single line from the console, copying the data into the given buffer.
 /// The length of this buffer must be provided.
 #[no_mangle]

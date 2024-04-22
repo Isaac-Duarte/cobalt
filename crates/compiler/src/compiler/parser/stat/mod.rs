@@ -102,14 +102,14 @@ pub(crate) struct MoveRef<'src> {
 
     /// The span of this variable that is targeted, if specified.
     /// This is only valid on variables of type PIC X(N), and is verified at code generation.
-    pub span: Option<MoveSpan>,
+    pub span: Option<MoveSpan<'src>>,
 }
 
 /// A single target span within a move reference variable.
 #[derive(Debug)]
-pub(crate) struct MoveSpan {
-    pub start_idx: usize,
-    pub len: usize,
+pub(crate) struct MoveSpan<'src> {
+    pub start_idx: Value<'src>,
+    pub len: Option<Value<'src>>,
 }
 
 impl<'src> Parser<'src> {
@@ -127,7 +127,9 @@ impl<'src> Parser<'src> {
                 Value::Literal(lit) => MoveSource::Literal(lit),
                 Value::Variable(sym) => {
                     // There may be a span specified, check.
-                    let span = (self.peek() == tok![open_par]).then(|| self.parse_span()).transpose()?;
+                    let span = (self.peek() == tok![open_par])
+                        .then(|| self.parse_span())
+                        .transpose()?;
                     MoveSource::MoveRef(MoveRef { sym, span })
                 }
             }
@@ -137,7 +139,9 @@ impl<'src> Parser<'src> {
         self.consume(tok![to])?;
         let dest_tok = self.consume(tok![ident])?;
         let sym = &self.text(dest_tok);
-        let span = (self.peek() == tok![open_par]).then(|| self.parse_span()).transpose()?;
+        let span = (self.peek() == tok![open_par])
+            .then(|| self.parse_span())
+            .transpose()?;
         let dest = MoveRef { sym, span };
         self.consume_vec(&[tok![.], tok![eol]])?;
 
@@ -145,24 +149,17 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a single [`MoveSpan`] from the current position.
-    fn parse_span(&mut self) -> Result<MoveSpan> {
+    fn parse_span(&mut self) -> Result<MoveSpan<'src>> {
         // Consume (S, E).
         self.consume(tok![open_par])?;
-        let start_idx = self.consume_int()?;
+        let start_idx = self.value()?;
         self.consume(tok![:])?;
-        let len = self.consume_int()?;
+        let len = (self.peek() != tok![close_par])
+            .then(|| self.value())
+            .transpose()?;
         self.consume(tok![close_par])?;
 
-        // Check that the indices provided make some sort of sense.
-        // We can't test them against the referenced symbol here, just a basic sanity check.
-        if start_idx < 0 {
-            parser_bail!(self, "Invalid start index {} (<0) provided for span.", start_idx);
-        }
-        if len < 1 {
-            parser_bail!(self, "Invalid length {} provided for span, must be >= 1.", len);
-        }
-
-        Ok(MoveSpan { start_idx: start_idx as usize, len: len as usize })
+        Ok(MoveSpan { start_idx, len })
     }
 }
 

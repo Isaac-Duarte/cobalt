@@ -28,6 +28,7 @@ pub(super) enum CobaltIntrinsic {
     PrintFloat,  // void cb_print_f64(f64)
     PrintInt,    // void cb_print_i64(i64)
     StrCmp,      // i8 cb_strcmp(char*, char*)
+    StrCpy,      // void cb_strcpy(char*, char*, i64, i64, i64, i64, i64, i64)
     ReadStr,     // void cb_readstr(char*, usize)
     ReadInt,     // i64 cb_readint()
     ReadFloat,   // f64 cb_readfloat()
@@ -99,6 +100,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::PrintFloat => printfloat_sig(&mut sig),
             CobaltIntrinsic::PrintInt => printint_sig(&mut sig),
             CobaltIntrinsic::StrCmp => strcmp_sig(&mut sig, module),
+            CobaltIntrinsic::StrCpy => strcpy_sig(&mut sig, module),
             CobaltIntrinsic::ReadStr => readstr_sig(&mut sig, module),
             CobaltIntrinsic::ReadInt => readint_sig(&mut sig),
             CobaltIntrinsic::ReadFloat => readfloat_sig(&mut sig),
@@ -125,6 +127,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::PrintFloat => "cb_print_f64",
             CobaltIntrinsic::PrintInt => "cb_print_i64",
             CobaltIntrinsic::StrCmp => "cb_strcmp",
+            CobaltIntrinsic::StrCpy => "cb_strcpy",
             CobaltIntrinsic::ReadStr => "cb_readstr",
             CobaltIntrinsic::ReadInt => "cb_readint",
             CobaltIntrinsic::ReadFloat => "cb_readfloat",
@@ -176,6 +179,18 @@ fn strcmp_sig(sig: &mut Signature, module: &mut ObjectModule) {
     sig.params.push(AbiParam::new(ptr_type));
     sig.params.push(AbiParam::new(ptr_type));
     sig.returns.push(AbiParam::new(types::I8));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::StrCpy`].
+fn strcpy_sig(sig: &mut Signature, module: &mut ObjectModule) {
+    let ptr_type = module.target_config().pointer_type();
+    sig.params.push(AbiParam::new(ptr_type)); // src_str
+    sig.params.push(AbiParam::new(ptr_type)); // dest_str
+
+    // src_len, dest_len, src_span_idx, src_span_len, dest_span_idx, dest_span_len
+    for _ in 0..6 {
+        sig.params.push(AbiParam::new(types::I64));
+    }
 }
 
 /// Generates a function signature for [`CobaltIntrinsic::ReadStr`].
