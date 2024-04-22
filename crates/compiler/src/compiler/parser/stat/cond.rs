@@ -37,7 +37,7 @@ impl<'src> Parser<'src> {
         while self.peek() != tok![end] && self.peek() != tok![else] {
             if_stats.push(self.stat()?);
         }
-        let mut if_stats = (if_stats.len() > 0).then(|| if_stats);
+        let mut if_stats = (!if_stats.is_empty()).then_some(if_stats);
 
         // If there's an "ELSE" statement block, parse that out.
         let mut else_stats = if self.peek() == tok![else] {
@@ -52,7 +52,7 @@ impl<'src> Parser<'src> {
         };
 
         // If we only have an "ELSE" block, we can optimise into a simple inverted condition.
-        if if_stats.is_none() && else_stats.as_ref().is_some_and(|s| s.len() > 0) {
+        if if_stats.is_none() && else_stats.as_ref().is_some_and(|s| !s.is_empty()) {
             if_stats = else_stats;
             else_stats = None;
             condition = Cond::Not(Box::new(condition));
@@ -87,7 +87,7 @@ impl<'src> Parser<'src> {
             tok![>] => Cond::Gt(first_op, second_op),
             tok![<=] => Cond::Le(first_op, second_op),
             tok![>=] => Cond::Ge(first_op, second_op),
-            tok @ _ => {
+            tok => {
                 parser_bail_spanned!(
                     self,
                     operator.1,

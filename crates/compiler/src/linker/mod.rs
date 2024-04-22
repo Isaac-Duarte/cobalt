@@ -42,7 +42,7 @@ impl<'cfg> Linker<'cfg> {
 
     /// Attempts to perform a link with the current set of user objects.
     pub fn link(self) -> Result<()> {
-        if self.user_objects.len() == 0 {
+        if self.user_objects.is_empty() {
             miette::bail!("linker: No user objects specified.");
         }
 

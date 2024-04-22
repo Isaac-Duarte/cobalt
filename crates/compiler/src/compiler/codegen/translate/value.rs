@@ -59,22 +59,22 @@ impl ValueCache {
 
     /// Searches the cache for a loaded [`GlobalValue`] for the given ID.
     pub fn get_gv(&self, data_id: &DataId) -> Option<GlobalValue> {
-        self.gv_cache.get(data_id).map(|x| *x)
+        self.gv_cache.get(data_id).copied()
     }
 
     /// Searches the cache for a static pointer [`Value`] for the given ID.
     pub fn get_static_ptr(&self, data_id: &DataId) -> Option<Value> {
-        self.sptr_cache.get(data_id).map(|x| *x)
+        self.sptr_cache.get(data_id).copied()
     }
 
     /// Searches the cache for a loaded literal [`Value`] for the given ID.
     pub fn get_litv(&self, lit: &Literal) -> Option<Value> {
-        self.litv_cache.get(lit).map(|x| *x)
+        self.litv_cache.get(lit).copied()
     }
 
     /// Searches the cache for a loaded [`CodegenLiteral`].
     pub fn get_cg_litv(&self, cglit: &CodegenLiteral) -> Option<Value> {
-        self.cglit_cache.get(cglit).map(|x| *x)
+        self.cglit_cache.get(cglit).copied()
     }
 
     /// Inserts the given [`GlobalValue`] into cache. Throws an error if the data is already present.

@@ -59,7 +59,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
                     .iter()
                     .nth(i)
                     .unwrap()
-                    .is_float(&self.data)?
+                    .is_float(self.data)?
                 {
                     // Convert from [`i64`] to [`f64`].
                     let fval = self.builder.ins().fcvt_from_sint(types::F64, *val);
@@ -150,7 +150,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         is_overwrite: bool,
         is_float: bool,
     ) -> Value {
-        assert!(vals.len() > 0);
+        assert!(!vals.is_empty());
 
         // If there's only one input value, no need to combine anything.
         if vals.len() == 1 {
@@ -222,9 +222,9 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     fn verify_basic_op_data(&self, op_data: &BasicMathOpData<'src>) -> Result<()> {
         // Check there are at least one source when appending to destination sources,
         // two sources when overwriting output & at least one output.
-        if (op_data.sources.len() == 0 && !op_data.overwrite_dests)
+        if (op_data.sources.is_empty() && !op_data.overwrite_dests)
             || (op_data.sources.len() == 1 && op_data.overwrite_dests)
-            || op_data.dests.len() == 0
+            || op_data.dests.is_empty()
         {
             miette::bail!("Arithmetic operations must have at least two sources and one output.");
         }

@@ -129,7 +129,7 @@ impl Pic {
         if self.is_float() {
             return types::F64.bytes().try_into().unwrap();
         }
-        return types::I64.bytes().try_into().unwrap();
+        types::I64.bytes().try_into().unwrap()
     }
 
     /// Verifies that the given literal fits within the data layout.
@@ -213,7 +213,7 @@ impl PicChunkType {
             'V' => PicChunkType::ImplicitDecimalPoint,
             'P' => PicChunkType::DecimalPoint,
             'S' => PicChunkType::Sign,
-            c @ _ => parser_bail!(
+            c => parser_bail!(
                 parser,
                 "Invalid data type for chunk '{}'. Expected one of '9AXVSP'.",
                 c
@@ -259,7 +259,7 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
         // Calculate the total byte length of the combined chunks.
         let mut byte_len = 0;
         let mut contains_alpha = false;
-        for chunk in (&self.chunks).iter() {
+        for chunk in self.chunks.iter() {
             match chunk.chunk_type {
                 PicChunkType::DecimalPoint | PicChunkType::Numeric | PicChunkType::Sign => {
                     byte_len += chunk.len;
@@ -319,7 +319,7 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
     fn parse_chunk(&mut self) -> Result<PicLayoutChunk> {
         // Get the data type of this chunk.
         let next = self.next()?;
-        let chunk_type = PicChunkType::from_char(&mut self.parser, next)?;
+        let chunk_type = PicChunkType::from_char(self.parser, next)?;
 
         // Parse subsequent identical sections until we reach a new type.
         // We also parse any following defined lengths, e.g. A(4), and add those.
@@ -332,7 +332,7 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
                 while self.peek().is_some_and(|c| c != ')') {
                     let digit = self.next()?;
                     // Skip leading zeroes.
-                    if digit == '0' && num_str.len() == 0 {
+                    if digit == '0' && num_str.is_empty() {
                         continue;
                     }
                     num_str.push(digit);
@@ -365,7 +365,7 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
     /// Verifies that the currently generated chunks are a valid PIC configuration.
     fn verify_chunks(&mut self) -> Result<()> {
         // Check for chunks which should be unique.
-        if (&self.chunks)
+        if self.chunks
             .iter()
             .filter(|c| {
                 c.chunk_type == PicChunkType::DecimalPoint
@@ -381,7 +381,7 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
         }
 
         // Check for invalid combinations of chunks.
-        if (&self.chunks)
+        if self.chunks
             .iter()
             .filter(|c| {
                 c.chunk_type == PicChunkType::Numeric
@@ -391,7 +391,7 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
             })
             .count()
             > 0
-            && (&self.chunks)
+            && self.chunks
                 .iter()
                 .filter(|c| {
                     c.chunk_type == PicChunkType::Alpha
@@ -407,7 +407,7 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
         }
 
         // Check individual chunk data.
-        for (idx, chunk) in (&self.chunks).iter().enumerate() {
+        for (idx, chunk) in self.chunks.iter().enumerate() {
             match chunk.chunk_type {
                 PicChunkType::Sign => {
                     if idx != 0 {

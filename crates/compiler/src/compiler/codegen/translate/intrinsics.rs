@@ -19,7 +19,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         }
         let ptr_type = self.module.target_config().pointer_type();
         for (idx, (val, param)) in call.args.iter().zip(sig.params.iter()).enumerate() {
-            let (is_str, is_float) = (val.is_str(&self.data)?, val.is_float(&self.data)?);
+            let (is_str, is_float) = (val.is_str(self.data)?, val.is_float(self.data)?);
             if is_str && param.value_type != ptr_type
               || is_float && param.value_type != types::F64
               || !is_str && !is_float && param.value_type != types::I64 {

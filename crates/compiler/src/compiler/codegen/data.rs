@@ -34,10 +34,10 @@ impl DataManager {
 
     /// Uploads all string literals, runtime variable data and other object data found
     /// within the AST as Cranelift data objects, registering them in the manager.
-    pub(super) fn upload<'src>(
+    pub(super) fn upload(
         &mut self,
         module: &mut ObjectModule,
-        ast: &Ast<'src>,
+        ast: &Ast<'_>,
     ) -> Result<()> {
         if let Some(data_div) = ast.data_div.as_ref() {
             self.upload_vars(module, &ast.str_lits, data_div)?;
@@ -47,7 +47,7 @@ impl DataManager {
     }
 
     /// Returns the Cranelift [`DataId`] associated with the given COBOL symbol.
-    pub(super) fn sym_data_id<'a>(&self, sym: &'a str) -> Result<DataId> {
+    pub(super) fn sym_data_id(&self, sym: &str) -> Result<DataId> {
         self.sym_map
             .get(sym)
             .map(|o| o.0)
@@ -55,7 +55,7 @@ impl DataManager {
     }
 
     /// Returns the [`Pic`] layout associated with the given COBOL symbol.
-    pub(super) fn sym_pic<'a>(&'a self, sym: &str) -> Result<&Pic> {
+    pub(super) fn sym_pic(&self, sym: &str) -> Result<&Pic> {
         self.sym_map
             .get(sym)
             .map(|o| &o.1)
@@ -64,7 +64,7 @@ impl DataManager {
 
     /// Returns the Cranelift [`DataId`] associated with the given [`LiteralId`].
     pub(super) fn str_data_id(&self, lit_id: StrLitId) -> Result<DataId> {
-        self.str_lit_map.get(&lit_id).map(|o| *o).ok_or(
+        self.str_lit_map.get(&lit_id).copied().ok_or(
             miette::diagnostic!(
                 "Failed to fetch data slot for literal string ID '{}'.",
                 lit_id
@@ -75,11 +75,11 @@ impl DataManager {
 
     /// Uploads variables present in the data division to the object file, registering them
     /// in the data manager's symbol table.
-    fn upload_vars<'src>(
+    fn upload_vars(
         &mut self,
         module: &mut ObjectModule,
         str_lits: &StrLitStore,
-        data_div: &DataDiv<'src>,
+        data_div: &DataDiv<'_>,
     ) -> Result<()> {
         let mut desc = DataDescription::new();
         for elem_var in data_div.ws_section.elementary_data.iter() {

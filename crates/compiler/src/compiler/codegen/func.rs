@@ -73,7 +73,7 @@ impl FuncManager {
         // Save the entrypoint info, if this is the entrypoint.
         if is_entrypoint {
             self.entrypoint = name.map(|s| s.to_string());
-            self.entrypoint_id = Some(func_id.clone());
+            self.entrypoint_id = Some(func_id);
         }
 
         // Insert the function information into the map, if it has a name.
@@ -86,7 +86,7 @@ impl FuncManager {
 
     /// Returns the [`FuncId`] for the entrypoint.
     pub fn get_entrypoint_id(&self) -> Result<FuncId> {
-        self.entrypoint_id.as_ref().map(|fi| fi.clone()).ok_or(
+        self.entrypoint_id.as_ref().map(|fi| *fi).ok_or(
             miette::diagnostic!(
                 "Failed to fetch function information for entrypoint, not yet defined."
             )
@@ -97,7 +97,7 @@ impl FuncManager {
     /// Returns the relevant [`FuncId`] for the given paragraph, if present.
     /// If not present, returns an error.
     pub fn get_id(&self, name: &str) -> Result<FuncId> {
-        self.func_map.get(name).map(|fi| fi.clone()).ok_or(
+        self.func_map.get(name).copied().ok_or(
             miette::diagnostic!("Failed to find function information for paragraph '{name}'.")
                 .into(),
         )
@@ -122,11 +122,11 @@ impl FuncManager {
         name: &str,
     ) -> Result<FuncRef> {
         if self.ref_map.contains_key(name) {
-            return Ok(self.ref_map.get(name).unwrap().clone());
+            return Ok(*self.ref_map.get(name).unwrap());
         }
         let func_id = self.get_id(name)?;
         let fn_ref = module.declare_func_in_func(func_id, func);
-        self.ref_map.insert(name.to_string(), fn_ref.clone());
+        self.ref_map.insert(name.to_string(), fn_ref);
         Ok(fn_ref)
     }
 

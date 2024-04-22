@@ -39,7 +39,7 @@ impl<'src> Parser<'src> {
             tok![accept] => self.parse_accept()?,
 
             // Unknown token.
-            tok @ _ => {
+            tok => {
                 self.next()?;
                 parser_bail!(
                     self,
@@ -230,7 +230,7 @@ impl<'src> Parser<'src> {
                 PerformType::Times(first_para_txt, val)
             }
 
-            tok @ _ => {
+            tok => {
                 self.next()?;
                 parser_bail!(self, "Unknown token in PERFORM statement '{}'.", tok);
             }

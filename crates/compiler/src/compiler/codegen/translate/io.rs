@@ -14,9 +14,9 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             let display_val = self.load_value(val)?;
 
             // Get the relevant intrinsic to output the value.
-            let display_intrinsic = if val.is_str(&self.data)? {
+            let display_intrinsic = if val.is_str(self.data)? {
                 CobaltIntrinsic::PrintStr
-            } else if val.is_float(&self.data)? {
+            } else if val.is_float(self.data)? {
                 CobaltIntrinsic::PrintFloat
             } else {
                 CobaltIntrinsic::PrintInt

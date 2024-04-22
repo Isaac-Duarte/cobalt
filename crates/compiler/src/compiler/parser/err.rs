@@ -25,10 +25,7 @@ pub struct GenericParseError {
 impl GenericParseError {
     /// Creates a new generic parse error, given the current parser state.
     pub fn new(parser: &Parser, msg: String) -> GenericParseError {
-        let span = match parser.cur() {
-            Some(tok) => Some(tok.1),
-            None => None,
-        };
+        let span = parser.cur().map(|tok| tok.1);
         Self {
             src: parser.get_named_source(),
             msg,

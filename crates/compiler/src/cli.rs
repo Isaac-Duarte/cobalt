@@ -51,10 +51,10 @@ impl BuildCommand {
     }
 
     pub fn output_name(&self) -> Option<String> {
-        self.output_name.as_ref().map(|x| x.clone())
+        self.output_name.clone()
     }
 
     pub fn output_dir(&self) -> Option<PathBuf> {
-        self.output_dir.as_ref().map(|x| x.clone())
+        self.output_dir.clone()
     }
 }

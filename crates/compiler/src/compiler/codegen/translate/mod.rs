@@ -86,7 +86,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     pub fn translate_terminate(&mut self) -> Result<()> {
         let libc_exit = self.intrinsics.get_ref(
             self.module,
-            &mut self.builder.func,
+            self.builder.func,
             CobaltIntrinsic::LibcExit,
         )?;
         let ptr_type = self.module.target_config().pointer_type();

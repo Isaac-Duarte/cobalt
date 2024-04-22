@@ -32,10 +32,10 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     ) -> Result<()> {
         // Translate the intrinsic call, load a pointer to the destination.
         let (ret_val, ret_type) = self.translate_intrinsic_call(call)?;
-        let dest_ptr = self.load_static_ptr(self.data.sym_data_id(&dest.sym)?)?;
+        let dest_ptr = self.load_static_ptr(self.data.sym_data_id(dest.sym)?)?;
 
         // Determine whether the output type of that intrinsic call is valid for the destination.
-        let dest_pic = self.data.sym_pic(&dest.sym)?;
+        let dest_pic = self.data.sym_pic(dest.sym)?;
         let ptr_type = self.module.target_config().pointer_type();
         if dest_pic.is_float() && ret_type != types::F64
             || dest_pic.is_str() && ret_type != ptr_type
@@ -48,7 +48,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         }
 
         // Verify the destination reference is valid.
-        dest.validate(dest_pic, &self.data)?;
+        dest.validate(dest_pic, self.data)?;
 
         // Perform a store of the value.
         if dest_pic.is_float() || (!dest_pic.is_float() && !dest_pic.is_str()) {
@@ -63,7 +63,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
 
     /// Moves the given literal into the provided global data slot.
     pub(super) fn translate_mov_lit(&mut self, lit: &Literal, dest: &MoveRef<'src>) -> Result<()> {
-        let dest_id = self.data.sym_data_id(&dest.sym)?;
+        let dest_id = self.data.sym_data_id(dest.sym)?;
 
         // Import the destination variable into the function, get a pointer to it.
         let ptr_type = self.module.target_config().pointer_type();
@@ -71,8 +71,8 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         let src_val = self.load_lit(lit)?;
 
         // Load the relevant PIC, verify the destination is valid.
-        let dest_pic = self.data.sym_pic(&dest.sym)?.clone();
-        dest.validate(&dest_pic, &self.data)?;
+        let dest_pic = self.data.sym_pic(dest.sym)?.clone();
+        dest.validate(&dest_pic, self.data)?;
 
         // Verify the source literal actually fits within the destination.
         if !dest_pic.verify_lit(&self.ast.str_lits, lit) {
@@ -158,8 +158,8 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         // Import both variables as global values, get pointers to them.
         let ptr_type = self.module.target_config().pointer_type();
         let (src_id, dest_id) = (
-            self.data.sym_data_id(&src.sym)?,
-            self.data.sym_data_id(&dest.sym)?,
+            self.data.sym_data_id(src.sym)?,
+            self.data.sym_data_id(dest.sym)?,
         );
         let (src_ptr, dest_ptr) = (
             self.load_static_ptr(src_id)?,
@@ -168,20 +168,18 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
 
         // Load the PIC for the source/destination.
         let (src_pic, dest_pic) = (
-            self.data.sym_pic(&src.sym)?.clone(),
-            self.data.sym_pic(&dest.sym)?.clone(),
+            self.data.sym_pic(src.sym)?.clone(),
+            self.data.sym_pic(dest.sym)?.clone(),
         );
 
         // Verify that the references are valid.
-        src.validate(&src_pic, &self.data)?;
-        dest.validate(&dest_pic, &self.data)?;
+        src.validate(&src_pic, self.data)?;
+        dest.validate(&dest_pic, self.data)?;
 
         // If neither variable contains a span, we can statically verify that the move is valid by checking their PIC layouts.
-        if src.span.is_none() && dest.span.is_none() {
-            if !src_pic.fits_within_comp(&dest_pic) {
-                miette::bail!("Attempted to move incompatible variable '{}' ({} bytes) into variable '{}' ({} bytes).",
-                src.sym, src_pic.comp_size(), dest.sym, dest_pic.comp_size());
-            }
+        if src.span.is_none() && dest.span.is_none() && !src_pic.fits_within_comp(&dest_pic) {
+            miette::bail!("Attempted to move incompatible variable '{}' ({} bytes) into variable '{}' ({} bytes).",
+            src.sym, src_pic.comp_size(), dest.sym, dest_pic.comp_size());
         }
 
         // Based on the source type, determine the copy mechanism.
@@ -330,7 +328,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             Literal::Int(i) => self.builder.ins().iconst(types::I64, *i),
             Literal::Float(f) => self.builder.ins().f64const(*f),
         };
-        self.values.insert_litv(lit, litv.clone())?;
+        self.values.insert_litv(lit, litv)?;
         Ok(litv)
     }
 
@@ -346,7 +344,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         let cglitv = match cglit {
             CodegenLiteral::Char(c) => self.builder.ins().iconst(types::I8, (*c as u8) as i64),
         };
-        self.values.insert_cg_litv(cglit, cglitv.clone())?;
+        self.values.insert_cg_litv(cglit, cglitv)?;
         Ok(cglitv)
     }
 
@@ -362,7 +360,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         let ptr_type = self.module.target_config().pointer_type();
         let gv = self.load_gv(data_id)?;
         let sptr = self.builder.ins().global_value(ptr_type, gv);
-        self.values.insert_static_ptr(&data_id, sptr.clone())?;
+        self.values.insert_static_ptr(&data_id, sptr)?;
         Ok(sptr)
     }
 
@@ -373,7 +371,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             return Ok(gv);
         }
         let gv = self.module.declare_data_in_func(data_id, self.builder.func);
-        self.values.insert_gv(&data_id, gv.clone())?;
+        self.values.insert_gv(&data_id, gv)?;
         Ok(gv)
     }
 }

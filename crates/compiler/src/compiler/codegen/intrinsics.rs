@@ -51,7 +51,7 @@ impl IntrinsicManager {
         let intrinsic = match name {
             "MOD" => CobaltIntrinsic::Mod,
             "LENGTH" => CobaltIntrinsic::Length,
-            unk @ _ => {
+            unk => {
                 miette::bail!(
                     "Unknown/unimplemented intrinsic '{}' was attempted to be resolved.",
                     unk

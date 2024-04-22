@@ -18,7 +18,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         if if_data.if_stats.is_none() && if_data.else_stats.is_none() {
             return Ok(());
         }
-        assert!(if_data.if_stats.as_ref().is_some_and(|s| s.len() > 0));
+        assert!(if_data.if_stats.as_ref().is_some_and(|s| !s.is_empty()));
 
         // Create blocks for the IF, ELSE and post-statement.
         let if_block = self.builder.create_block();
@@ -116,32 +116,31 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         float_cc: FloatCC,
     ) -> Result<Value> {
         let (mut l_val, mut r_val) = (self.load_value(l)?, self.load_value(r)?);
-        let use_float_cmp = l.is_float(&self.data)? || r.is_float(&self.data)?;
+        let use_float_cmp = l.is_float(self.data)? || r.is_float(self.data)?;
 
         // If the comparison requires a floating point comparison, convert both sides to float.
         if use_float_cmp {
-            if !l.is_float(&self.data)? {
+            if !l.is_float(self.data)? {
                 l_val = self.builder.ins().fcvt_from_sint(types::F64, l_val);
             }
-            if !r.is_float(&self.data)? {
+            if !r.is_float(self.data)? {
                 r_val = self.builder.ins().fcvt_from_sint(types::F64, r_val);
             }
         }
 
         // Perform the comparison based on type.
-        let result = if l.is_str(&self.data)? || r.is_str(&self.data)? {
+        let result = if l.is_str(self.data)? || r.is_str(self.data)? {
             // String comparison, this must be an equality. We must use our `strcmp` intrinsic.
             assert!(int_cc == IntCC::Equal && float_cc == FloatCC::Equal);
             let strcmp = self.intrinsics.get_ref(
-                &mut self.module,
-                &mut self.builder.func,
+                self.module,
+                self.builder.func,
                 CobaltIntrinsic::StrCmp,
             )?;
             let inst = self.builder.ins().call(strcmp, &[l_val, r_val]);
             *self
                 .builder
-                .inst_results(inst)
-                .get(0)
+                .inst_results(inst).first()
                 .expect("Strcmp intrinsic does not return a result.")
         } else if use_float_cmp {
             self.builder.ins().fcmp(float_cc, l_val, r_val)
@@ -203,8 +202,8 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         left: &parser::Value<'src>,
         right: &parser::Value<'src>,
     ) -> Result<()> {
-        if (left.is_str(&self.data)? && !right.is_str(&self.data)?)
-            || (!left.is_str(&self.data)? && right.is_str(&self.data)?)
+        if (left.is_str(self.data)? && !right.is_str(self.data)?)
+            || (!left.is_str(self.data)? && right.is_str(self.data)?)
         {
             miette::bail!("Cannot compare a string variable to a non-string variable.");
         }
@@ -218,7 +217,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         right: &parser::Value<'src>,
     ) -> Result<()> {
         // String types cannot be ordinally compared.
-        if left.is_str(&self.data)? || right.is_str(&self.data)? {
+        if left.is_str(self.data)? || right.is_str(self.data)? {
             miette::bail!("Cannot ordinally compare string variables.");
         }
         Ok(())

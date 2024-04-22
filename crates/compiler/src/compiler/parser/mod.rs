@@ -86,7 +86,7 @@ impl<'src> Parser<'src> {
 
     /// Performs a full parse of the compile unit, returning an AST.
     pub fn parse(self) -> Result<Ast<'src>> {
-        Ok(self.ast()?)
+        self.ast()
     }
 
     //Returns the text for the provided token's span.
@@ -169,7 +169,7 @@ impl<'src> Parser<'src> {
 
     //Returns the source code being parsed as a NamedSource.
     pub fn get_named_source(&self) -> NamedSource<String> {
-        NamedSource::new(self.cu_name.to_string(), self.input.to_string())
+        NamedSource::new(self.cu_name, self.input.to_string())
     }
 }
 
