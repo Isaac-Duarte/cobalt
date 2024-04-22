@@ -33,6 +33,7 @@ pub(super) enum CobaltIntrinsic {
     ReadInt,     // i64 cb_readint()
     ReadFloat,   // f64 cb_readfloat()
     Mod,         // i64 cb_mod(i64, i64)
+    Length,      // i64 cb_length(char*)
 }
 
 impl IntrinsicManager {
@@ -49,6 +50,7 @@ impl IntrinsicManager {
     pub fn resolve_name(&self, name: &str) -> Result<CobaltIntrinsic> {
         let intrinsic = match name {
             "MOD" => CobaltIntrinsic::Mod,
+            "LENGTH" => CobaltIntrinsic::Length,
             unk @ _ => {
                 miette::bail!(
                     "Unknown/unimplemented intrinsic '{}' was attempted to be resolved.",
@@ -105,6 +107,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::ReadInt => readint_sig(&mut sig),
             CobaltIntrinsic::ReadFloat => readfloat_sig(&mut sig),
             CobaltIntrinsic::Mod => mod_sig(&mut sig),
+            CobaltIntrinsic::Length => length_sig(&mut sig, module),
         };
         sig
     }
@@ -132,6 +135,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::ReadInt => "cb_readint",
             CobaltIntrinsic::ReadFloat => "cb_readfloat",
             CobaltIntrinsic::Mod => "cb_mod",
+            CobaltIntrinsic::Length => "cb_length",
         };
 
         // Import it.
@@ -214,5 +218,12 @@ fn readfloat_sig(sig: &mut Signature) {
 fn mod_sig(sig: &mut Signature) {
     sig.params.push(AbiParam::new(types::I64));
     sig.params.push(AbiParam::new(types::I64));
+    sig.returns.push(AbiParam::new(types::I64));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::Length`].
+fn length_sig(sig: &mut Signature, module: &mut ObjectModule) {
+    let ptr_type = module.target_config().pointer_type();
+    sig.params.push(AbiParam::new(ptr_type));
     sig.returns.push(AbiParam::new(types::I64));
 }

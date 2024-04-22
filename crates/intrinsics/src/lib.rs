@@ -110,11 +110,12 @@ pub unsafe extern "C" fn cb_strcpy(
     // If that's the case, we need to overwrite it with spaces.
     let dest_cstr: &CStr = unsafe { CStr::from_ptr(dest_str) };
     let dest_slice: &str = dest_cstr.to_str().unwrap();
-    if dest_slice.len() < src_span_idx as usize {
+    let orig_dest_len = dest_slice.len();
+    if dest_slice.len() < dest_span_idx as usize {
         libc::memset(
             dest_str.add(dest_slice.len()).cast(),
             (' ' as u8) as i32,
-            src_span_idx as usize - dest_slice.len(),
+            dest_span_idx as usize - dest_slice.len(),
         );
     }
 
@@ -126,8 +127,10 @@ pub unsafe extern "C" fn cb_strcpy(
     // Perform copy (possibly overlapping).
     core::ptr::copy(src_ptr, dest_ptr, size);
 
-    // Add a null terminator.
-    *dest_ptr.add(size) = b'\0' as _;
+    // Add a null terminator, if the original string ended before where our copy ended.
+    if orig_dest_len < (dest_span_idx as usize) + size {
+        *dest_ptr.add(size) = b'\0' as _;
+    }
 }
 
 /// Reads a single line from the console, copying the data into the given buffer.
@@ -189,4 +192,13 @@ unsafe fn cb_readline() -> String {
 #[no_mangle]
 pub unsafe extern "C" fn cb_mod(a: i64, b: i64) -> i64 {
     a % b
+}
+
+/// COBOL length intrinsic.
+/// Returns the length of the given string.
+#[no_mangle]
+pub unsafe extern "C" fn cb_length(str: *const c_char) -> i64 {
+    let c_str: &CStr = unsafe { CStr::from_ptr(str) };
+    let slice: &str = c_str.to_str().unwrap();
+    slice.len() as i64
 }

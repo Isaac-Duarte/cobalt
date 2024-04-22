@@ -29,6 +29,24 @@ PROCEDURE DIVISION.
     DISPLAY "String B: " STRING-B.
     DISPLAY "".
 
+    DISPLAY "-- Interspersed Substring Move --".
+    MOVE "Hello World" TO STRING-B.
+    DISPLAY "String B: " STRING-B.
+    MOVE "Inter" TO STRING-B(4:).
+    DISPLAY "String B: " STRING-B.
+    DISPLAY "".
+
+    DISPLAY "-- Extending Substring Move --".
+    MOVE "GARBAGEGARB" TO STRING-B.
+    MOVE "Hello" TO STRING-B.
+    MOVE "Test" TO STRING-A.
+    DISPLAY "String A: " STRING-A.
+    DISPLAY "String B: " STRING-B.
+    MOVE STRING-A TO STRING-B(6:).
+    DISPLAY "String A: " STRING-A.
+    DISPLAY "String B: " STRING-B.
+    DISPLAY "".
+
     DISPLAY "-- Iterative Substring --".
     MOVE "" TO STRING-A.
     DISPLAY "String A: " STRING-A.

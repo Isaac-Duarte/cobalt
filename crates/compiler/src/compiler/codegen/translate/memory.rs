@@ -267,17 +267,22 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             let len = if let Some(len) = &span.len {
                 self.load_value(len)?
             } else {
+                // -1 to remove the null terminator
                 let total_len = self
                     .builder
                     .ins()
-                    .iconst(types::I64, pic.comp_size() as i64);
+                    .iconst(types::I64, pic.comp_size() as i64 - 1);
                 self.builder.ins().isub(total_len, idx)
             };
             Ok((idx, len))
         } else {
             // No span specified for source, use whole string.
             let idx = self.builder.ins().iconst(ptr_type, 0);
-            let len = self.builder.ins().iconst(ptr_type, pic.comp_size() as i64);
+            // -1 to remove the null terminator
+            let len = self
+                .builder
+                .ins()
+                .iconst(ptr_type, pic.comp_size() as i64 - 1);
             Ok((idx, len))
         }
     }
