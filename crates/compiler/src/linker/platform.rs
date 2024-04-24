@@ -25,7 +25,7 @@ impl PlatformConfig {
         if env::consts::ARCH == "x86_64" && env::consts::OS == "linux" {
             Self::detect_linux_x64()
         } else if env::consts::ARCH == "aarch64" && env::consts::OS == "linux" {
-            unimplemented!()
+            Self::detect_linux_aarch64()
         } else {
             miette::bail!(
                 "Unsupported platform/architecture ({}, {}) for linker.",
@@ -66,8 +66,33 @@ impl PlatformConfig {
         }
 
         Ok(PlatformConfig {
-            crt1_o: PathBuf::from("/usr/lib/x86_64-linux-gnu/crt1.o"),
-            dyn_linker: Some(PathBuf::from("/lib64/ld-linux-x86-64.so.2")),
+            crt1_o: crt,
+            dyn_linker: Some(loader),
+            lib_paths: Vec::new(),
+        })
+    }
+
+    /// Detects the linker configuration for an aarch64 Linux host.
+    fn detect_linux_aarch64() -> Result<Self> {
+        // Sanity check that the crt, loader exist.
+        let crt = PathBuf::from("/usr/lib64/crt1.o");
+        let loader = PathBuf::from("/usr/lib/ld-linux-aarch64.so.1");
+        if !crt.exists() {
+            miette::bail!(
+                "linker: Could not find platform `crt1.o` -- file not found @ {}.",
+                crt.to_str().unwrap()
+            );
+        }
+        if !loader.exists() {
+            miette::bail!(
+                "linker: Could not find platform `ld64.so` -- file not found @ {}.",
+                loader.to_str().unwrap()
+            );
+        }
+
+        Ok(PlatformConfig {
+            crt1_o: crt,
+            dyn_linker: Some(loader),
             lib_paths: Vec::new(),
         })
     }
