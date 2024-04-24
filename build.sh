@@ -9,6 +9,7 @@ set -e
 ## CONSTANTS ##
 ###############
 
+ORANGE='\033[0;33m'
 CYAN='\033[0;36m'
 GREEN='\033[1;32m'
 NC='\033[0m'
@@ -32,9 +33,22 @@ echo -e "${CYAN}Building compiler...${NC}"
 cd "${SCRIPT_DIR}/crates/compiler/"
 cargo build
 
+# If the architecture is aarch64, we build with PAC/BTI.
+arch=$(uname -m)
 echo -e "${CYAN}Building intrinsics library...${NC}"
 cd "${SCRIPT_DIR}/crates/intrinsics/"
-cargo build
+if [[ $arch == "aarch64" ]]; then
+    echo -e "${CYAN}Building intrinsics with aarch64 security features enabled.${NC}"
+    rustup default nightly
+    rustup component add rust-src --toolchain nightly-aarch64-unknown-linux-gnu
+    RUSTFLAGS="-Z branch-protection=bti,pac-ret,leaf" cargo build \
+        -Zbuild-std="core,alloc,panic_abort" \
+        --target aarch64-unknown-linux-gnu
+    rustup default stable
+else
+    echo -e "${ORANGE}Non-aarch64 architecture detected, building intrinsics with security features OFF.${NC}"
+    cargo build
+fi
 
 # Copy the build artifacts out.
 echo -e "${CYAN}Copying build artifacts...${NC}"
