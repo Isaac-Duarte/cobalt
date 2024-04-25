@@ -37,7 +37,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             .ins()
             .brif(cond_result, if_block, &[], brif_else_block, &[]);
 
-        // Seal blocks that have had all their branch instructions defined.d
+        // Seal blocks that have had all their branch instructions defined.
         self.builder.seal_block(if_block);
         if let Some(else_block) = else_block {
             self.builder.seal_block(else_block);
