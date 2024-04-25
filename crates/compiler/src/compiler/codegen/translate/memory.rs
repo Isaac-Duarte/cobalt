@@ -136,7 +136,6 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
                 } else {
                     // No span found, just use a simple memcpy.
                     let src_size = src_len + 1; // +1 for the null terminator
-                    println!("{}", src_size);
                     let size_val = self.builder.ins().iconst(ptr_type, src_size as i64);
 
                     // Sanity check.

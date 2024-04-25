@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use cranelift::{
     codegen::{
         ir::{AbiParam, InstBuilder},
-        settings::{self, Configurable},
         verify_function,
     },
     frontend::{FunctionBuilder, FunctionBuilderContext},
@@ -18,7 +17,7 @@ use miette::Result;
 use crate::config::BuildConfig;
 
 use self::{
-    data::DataManager, func::FuncManager, intrinsics::IntrinsicManager, translate::FuncTranslator,
+    data::DataManager, func::FuncManager, intrinsics::IntrinsicManager, isa::Isa, translate::FuncTranslator
 };
 
 use super::parser::{Ast, Paragraph};
@@ -26,6 +25,7 @@ use super::parser::{Ast, Paragraph};
 mod data;
 mod func;
 mod intrinsics;
+mod isa;
 mod translate;
 mod utils;
 
@@ -61,14 +61,7 @@ pub struct CodeGenerator<'cfg, 'src> {
 impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
     /// Creates a new code generator based on the given AST.
     pub fn new(cfg: &'cfg BuildConfig, ast: Ast<'src>) -> Result<Self> {
-        let mut flag_builder = settings::builder();
-        flag_builder.set("use_colocated_libcalls", "false").unwrap();
-        flag_builder.set("is_pic", "false").unwrap();
-        let isa_builder = cranelift_native::builder().unwrap();
-        let isa = isa_builder
-            .finish(settings::Flags::new(flag_builder))
-            .unwrap();
-
+        let isa = Isa::new_from_platform()?.to_cranelift_isa()?;
         let obj_builder = ObjectBuilder::new(
             isa,
             ast.ident_div.program_id,
