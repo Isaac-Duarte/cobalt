@@ -7,7 +7,7 @@ use cranelift::{
 };
 use miette::Result;
 
-use crate::compiler::parser::{self, Cond, Literal, PerformType};
+use crate::compiler::parser::{self, Cond, ExitType, Literal, PerformType};
 
 use super::FuncTranslator;
 
@@ -182,6 +182,16 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         self.switch_to_block(trailing_block);
         self.builder.seal_block(loop_test_block);
         self.builder.seal_block(trailing_block);
+        Ok(())
+    }
+
+    /// Translates a single exit instruction to Cranelift IR.
+    pub(super) fn translate_exit(&mut self, exit_type: &ExitType) -> Result<()> {
+        match exit_type {
+            ExitType::Paragraph => {
+                self.builder.ins().return_(&[]);
+            }
+        }
         Ok(())
     }
 }

@@ -40,6 +40,8 @@ macro_rules! tok {
     [times] => { $crate::compiler::parser::Token::Times };
     [accept] => { $crate::compiler::parser::Token::Accept };
     [function] => { $crate::compiler::parser::Token::Function };
+    [exit] => { $crate::compiler::parser::Token::Exit };
+    [paragraph] => { $crate::compiler::parser::Token::Paragraph };
     [=] => { $crate::compiler::parser::Token::Equals };
     [<=] => { $crate::compiler::parser::Token::LessThanEqual };
     [>=] => { $crate::compiler::parser::Token::GreaterThanEqual };
@@ -185,6 +187,10 @@ pub(crate) enum Token {
     Accept,
     #[token("FUNCTION")]
     Function,
+    #[token("EXIT")]
+    Exit,
+    #[token("PARAGRAPH")]
+    Paragraph,
 
     // Symbols & regex tokens.
     #[token("=")]
@@ -269,6 +275,8 @@ impl Display for Token {
             Token::Times => write!(f, "TIMES"),
             Token::Accept => write!(f, "ACCEPT"),
             Token::Function => write!(f, "FUNCTION"),
+            Token::Exit => write!(f, "EXIT"),
+            Token::Paragraph => write!(f, "PARAGRAPH"),
             Token::Equals => write!(f, "="),
             Token::LessThanEqual => write!(f, "<="),
             Token::GreaterThanEqual => write!(f, ">="),

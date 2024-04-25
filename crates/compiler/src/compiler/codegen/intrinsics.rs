@@ -34,6 +34,7 @@ pub(super) enum CobaltIntrinsic {
     ReadFloat,   // f64 cb_readfloat()
     Mod,         // i64 cb_mod(i64, i64)
     Length,      // i64 cb_length(char*)
+    Random,      // i64 cb_random()
 }
 
 impl IntrinsicManager {
@@ -51,6 +52,7 @@ impl IntrinsicManager {
         let intrinsic = match name {
             "MOD" => CobaltIntrinsic::Mod,
             "LENGTH" => CobaltIntrinsic::Length,
+            "RANDOM" => CobaltIntrinsic::Random,
             unk => {
                 miette::bail!(
                     "Unknown/unimplemented intrinsic '{}' was attempted to be resolved.",
@@ -108,6 +110,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::ReadFloat => readfloat_sig(&mut sig),
             CobaltIntrinsic::Mod => mod_sig(&mut sig),
             CobaltIntrinsic::Length => length_sig(&mut sig, module),
+            CobaltIntrinsic::Random => random_sig(&mut sig),
         };
         sig
     }
@@ -136,6 +139,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::ReadFloat => "cb_readfloat",
             CobaltIntrinsic::Mod => "cb_mod",
             CobaltIntrinsic::Length => "cb_length",
+            CobaltIntrinsic::Random => "cb_random",
         };
 
         // Import it.
@@ -225,5 +229,10 @@ fn mod_sig(sig: &mut Signature) {
 fn length_sig(sig: &mut Signature, module: &mut ObjectModule) {
     let ptr_type = module.target_config().pointer_type();
     sig.params.push(AbiParam::new(ptr_type));
+    sig.returns.push(AbiParam::new(types::I64));
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::Random`].
+fn random_sig(sig: &mut Signature) {
     sig.returns.push(AbiParam::new(types::I64));
 }

@@ -2,10 +2,12 @@ use super::{parser_bail, token::tok, Literal, Parser, Spanned, Value};
 use miette::Result;
 
 pub(crate) use cond::*;
+pub(crate) use control::*;
 pub(crate) use intrinsics::*;
 pub(crate) use math::*;
 
 mod cond;
+mod control;
 mod intrinsics;
 mod math;
 
@@ -21,6 +23,7 @@ pub(crate) enum Stat<'src> {
     If(IfData<'src>),
     Perform(PerformType<'src>),
     Accept(&'src str),
+    Exit(ExitType),
 }
 
 impl<'src> Parser<'src> {
@@ -37,6 +40,7 @@ impl<'src> Parser<'src> {
             tok![if] => self.parse_if()?,
             tok![perform] => self.parse_perform()?,
             tok![accept] => self.parse_accept()?,
+            tok![exit] => self.parse_exit()?,
 
             // Unknown token.
             tok => {
@@ -160,82 +164,5 @@ impl<'src> Parser<'src> {
         self.consume(tok![close_par])?;
 
         Ok(MoveSpan { start_idx, len })
-    }
-}
-
-/// Available variants for a single "PERFORM" instruction.
-#[derive(Debug)]
-pub(crate) enum PerformType<'src> {
-    Single(&'src str),
-    Thru(&'src str, &'src str),
-    Until {
-        target: &'src str,
-        cond: Cond<'src>,
-        test_cond_before: bool,
-    },
-    Times(&'src str, Value<'src>),
-    // Varying()
-}
-
-impl<'src> Parser<'src> {
-    /// Parses a single "PERFORM" statement from the current position.
-    fn parse_perform(&mut self) -> Result<Stat<'src>> {
-        self.consume(tok![perform])?;
-        let first_para_tok = self.consume(tok![ident])?;
-        let first_para_txt = self.text(first_para_tok);
-        let perform = match self.peek() {
-            // PERFORM X
-            tok![.] => {
-                self.consume_vec(&[tok![.], tok![eol]])?;
-                PerformType::Single(first_para_txt)
-            }
-
-            // PERFORM X THRU Y
-            tok![thru] => {
-                self.next()?;
-                let end_para_tok = self.consume(tok![ident])?;
-                self.consume_vec(&[tok![.], tok![eol]])?;
-                PerformType::Thru(first_para_txt, self.text(end_para_tok))
-            }
-
-            // PERFORM X UNTIL Y=Z
-            tok![test_before] | tok![test_after] | tok![until] => {
-                // Determine which side the check is on.
-                let test_cond_before = match self.peek() {
-                    tok![test_after] => {
-                        self.next()?;
-                        false
-                    }
-                    tok![test_before] => {
-                        self.next()?;
-                        true
-                    }
-                    _ => true,
-                };
-
-                self.consume(tok![until])?;
-                let cond = self.parse_cond()?;
-                self.consume_vec(&[tok![.], tok![eol]])?;
-                PerformType::Until {
-                    target: first_para_txt,
-                    cond,
-                    test_cond_before,
-                }
-            }
-
-            // PERFORM X Y TIMES
-            tok![ident] | tok![int_lit] => {
-                let val = self.value()?;
-                self.consume_vec(&[tok![times], tok![.], tok![eol]])?;
-                PerformType::Times(first_para_txt, val)
-            }
-
-            tok => {
-                self.next()?;
-                parser_bail!(self, "Unknown token in PERFORM statement '{}'.", tok);
-            }
-        };
-
-        Ok(Stat::Perform(perform))
     }
 }

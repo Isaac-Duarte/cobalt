@@ -37,7 +37,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             .ins()
             .brif(cond_result, if_block, &[], brif_else_block, &[]);
 
-        // Seal blocks that have had all their branch instructions defined.
+        // Seal blocks that have had all their branch instructions defined.d
         self.builder.seal_block(if_block);
         if let Some(else_block) = else_block {
             self.builder.seal_block(else_block);
@@ -46,10 +46,17 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         // Switch to the if block, translate contents.
         // Once the if block is done, we jump to the trailing block.
         self.switch_to_block(if_block);
+        let mut block_self_terminates = false;
         for stat in if_data.if_stats.as_ref().unwrap() {
-            self.translate_stat(stat)?;
+            // If this block has already terminated, we don't want to generate anything else.
+            if block_self_terminates {
+                miette::bail!("Unreachable statements detected in block: No statements should be placed after unconditional jumps.");
+            }
+            block_self_terminates |= self.translate_stat(stat)?;
         }
-        self.builder.ins().jump(trailing_block, &[]);
+        if !block_self_terminates {
+            self.builder.ins().jump(trailing_block, &[]);
+        }
 
         // We can't seal the trailing block yet if we still have an "else" to translate.
         if else_block.is_none() {
@@ -59,10 +66,17 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         // If there's an else block, translate contents.
         if let Some(else_stats) = if_data.else_stats.as_ref() {
             self.switch_to_block(else_block.unwrap());
+            let mut block_self_terminates = false;
             for stat in else_stats {
-                self.translate_stat(stat)?;
+                // If this block has already terminated, we don't want to generate anything else.
+                if block_self_terminates {
+                    miette::bail!("Unreachable statements detected in block: No statements should be placed after unconditional jumps.");
+                }
+                block_self_terminates |= self.translate_stat(stat)?;
             }
-            self.builder.ins().jump(trailing_block, &[]);
+            if !block_self_terminates {
+                self.builder.ins().jump(trailing_block, &[]);
+            }
             self.builder.seal_block(trailing_block);
         }
 
@@ -132,15 +146,14 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         let result = if l.is_str(self.data)? || r.is_str(self.data)? {
             // String comparison, this must be an equality. We must use our `strcmp` intrinsic.
             assert!(int_cc == IntCC::Equal && float_cc == FloatCC::Equal);
-            let strcmp = self.intrinsics.get_ref(
-                self.module,
-                self.builder.func,
-                CobaltIntrinsic::StrCmp,
-            )?;
+            let strcmp =
+                self.intrinsics
+                    .get_ref(self.module, self.builder.func, CobaltIntrinsic::StrCmp)?;
             let inst = self.builder.ins().call(strcmp, &[l_val, r_val]);
             *self
                 .builder
-                .inst_results(inst).first()
+                .inst_results(inst)
+                .first()
                 .expect("Strcmp intrinsic does not return a result.")
         } else if use_float_cmp {
             self.builder.ins().fcmp(float_cc, l_val, r_val)

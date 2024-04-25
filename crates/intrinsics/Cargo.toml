@@ -16,3 +16,5 @@ panic = "abort"
 libc = "0.2.153"
 libc-print = "0.1.22"
 libc_alloc = "1.0.7"
+once_cell = { version = "1.19.0", features = ["alloc"], default-features = false }
+rand = { version = "0.8.5", features = ["small_rng"], default-features = false }

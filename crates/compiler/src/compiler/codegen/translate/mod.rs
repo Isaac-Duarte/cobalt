@@ -75,8 +75,13 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         self.funcs.clear_refs();
 
         // Translate all statements within the function.
+        let mut block_self_terminates = false;
         for stat in stats {
-            self.translate_stat(stat)?;
+            // If this block has already unconditionally terminated, we don't want to generate anything else.
+            if block_self_terminates {
+                miette::bail!("Unreachable statements detected in block: No statements should be placed after unconditional jumps.");
+            }
+            block_self_terminates |= self.translate_stat(stat)?;
         }
         Ok(())
     }
@@ -84,11 +89,9 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     /// Generates Cranelift IR for a program termination.
     /// Required for paragraphs which unconditionally terminate the program (e.g. with `STOP RUN`).
     pub fn translate_terminate(&mut self) -> Result<()> {
-        let libc_exit = self.intrinsics.get_ref(
-            self.module,
-            self.builder.func,
-            CobaltIntrinsic::LibcExit,
-        )?;
+        let libc_exit =
+            self.intrinsics
+                .get_ref(self.module, self.builder.func, CobaltIntrinsic::LibcExit)?;
         let ptr_type = self.module.target_config().pointer_type();
         let exit_code = self.builder.ins().iconst(ptr_type, 0x0);
         self.builder.ins().call(libc_exit, &[exit_code]);
@@ -96,7 +99,9 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     }
 
     /// Generates Cranelift IR for a single statement from the given set of statements.
-    fn translate_stat(&mut self, stat: &Spanned<Stat<'src>>) -> Result<()> {
+    /// Returns whether this statement has filled the current block.
+    fn translate_stat(&mut self, stat: &Spanned<Stat<'src>>) -> Result<bool> {
+        // Translate the statement itself.
         match &stat.0 {
             Stat::Display(vals) => self.translate_display(vals)?,
             Stat::Move(mov_data) => self.translate_move(mov_data)?,
@@ -107,8 +112,14 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             Stat::If(if_data) => self.translate_if(if_data)?,
             Stat::Perform(perform) => self.translate_perform(perform)?,
             Stat::Accept(target) => self.translate_accept(target)?,
+            Stat::Exit(exit_type) => self.translate_exit(exit_type)?,
         }
-        Ok(())
+
+        // Determine whether the statement has filled the block.
+        match &stat.0 {
+            Stat::Exit(_) => Ok(true),
+            _ => Ok(false),
+        }
     }
 
     /// Switches the function translator to point to the given block.

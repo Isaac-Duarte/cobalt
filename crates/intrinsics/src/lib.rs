@@ -1,9 +1,14 @@
 #![no_std]
 extern crate alloc;
 use alloc::string::String;
-use core::ffi::{c_char, CStr};
+use core::{
+    ffi::{c_char, CStr},
+    ptr::null_mut,
+};
 use libc_alloc::LibcAlloc;
 use libc_print::std_name::print;
+use once_cell::unsync::Lazy;
+use rand::{rngs::SmallRng, RngCore, SeedableRng};
 
 /// This is a horrible hack.
 /// Currently, `rustc` is buggy, and includes an external reference to the `eh_personality`
@@ -201,4 +206,13 @@ pub unsafe extern "C" fn cb_length(str: *const c_char) -> i64 {
     let c_str: &CStr = unsafe { CStr::from_ptr(str) };
     let slice: &str = c_str.to_str().unwrap();
     slice.len() as i64
+}
+
+/// COBOL random intrinsic.
+/// Generates a random integer and returns it.
+#[no_mangle]
+pub unsafe extern "C" fn cb_random() -> i64 {
+    static mut RNG: Lazy<SmallRng> =
+        Lazy::new(|| SmallRng::seed_from_u64(unsafe { libc::time(null_mut()) } as u64));
+    RNG.next_u64() as i64
 }
