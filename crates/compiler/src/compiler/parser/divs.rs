@@ -90,7 +90,7 @@ impl<'src> Parser<'src> {
         // Keep parsing statements until we hit the end. There must be at least 1 statement per paragraph.
         let mut stats: Vec<Spanned<Stat<'src>>> = Vec::new();
         loop {
-            stats.push(self.stat()?);
+            stats.push(self.stat(true)?);
 
             // Consume any lines between statements, we don't care about those.
             while self.peek() == tok![eol] {

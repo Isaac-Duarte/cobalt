@@ -34,8 +34,8 @@ impl<'src> Parser<'src> {
 
         // Iterate & parse out "IF" statement block.
         let mut if_stats: Vec<Spanned<Stat<'src>>> = Vec::new();
-        while self.peek() != tok![end] && self.peek() != tok![else] {
-            if_stats.push(self.stat()?);
+        while self.peek() != tok![end_if] && self.peek() != tok![else] {
+            if_stats.push(self.stat(false)?);
         }
         let mut if_stats = (!if_stats.is_empty()).then_some(if_stats);
 
@@ -43,8 +43,8 @@ impl<'src> Parser<'src> {
         let mut else_stats = if self.peek() == tok![else] {
             self.consume_vec(&[tok![else], tok![eol]])?;
             let mut stats: Vec<Spanned<Stat<'src>>> = Vec::new();
-            while self.peek() != tok![end] {
-                stats.push(self.stat()?);
+            while self.peek() != tok![end_if] {
+                stats.push(self.stat(false)?);
             }
             Some(stats)
         } else {
@@ -58,7 +58,7 @@ impl<'src> Parser<'src> {
             condition = Cond::Not(Box::new(condition));
         }
 
-        self.consume_vec(&[tok![end], tok![if], tok![.], tok![eol]])?;
+        self.consume(tok![end_if])?;
 
         Ok(Stat::If(IfData {
             if_stats,

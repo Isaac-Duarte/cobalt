@@ -27,8 +27,7 @@ impl<'src> Parser<'src> {
         let first_para_txt = self.text(first_para_tok);
         let perform = match self.peek() {
             // PERFORM X
-            tok![.] => {
-                self.consume_vec(&[tok![.], tok![eol]])?;
+            tok![.] | tok![eol] => {
                 PerformType::Single(first_para_txt)
             }
 
@@ -36,7 +35,6 @@ impl<'src> Parser<'src> {
             tok![thru] => {
                 self.next()?;
                 let end_para_tok = self.consume(tok![ident])?;
-                self.consume_vec(&[tok![.], tok![eol]])?;
                 PerformType::Thru(first_para_txt, self.text(end_para_tok))
             }
 
@@ -57,7 +55,7 @@ impl<'src> Parser<'src> {
 
                 self.consume(tok![until])?;
                 let cond = self.parse_cond()?;
-                self.consume_vec(&[tok![.], tok![eol]])?;
+
                 PerformType::Until {
                     target: first_para_txt,
                     cond,
@@ -68,7 +66,7 @@ impl<'src> Parser<'src> {
             // PERFORM X Y TIMES
             tok![ident] | tok![int_lit] => {
                 let val = self.value()?;
-                self.consume_vec(&[tok![times], tok![.], tok![eol]])?;
+                self.consume(tok![times])?;
                 PerformType::Times(first_para_txt, val)
             }
 
@@ -102,7 +100,6 @@ impl<'src> Parser<'src> {
             }
         };
         self.next()?;
-        self.consume_vec(&[tok![.], tok![eol]])?;
         Ok(Stat::Exit(exit_type))
     }
 }

@@ -44,23 +44,24 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             src_vals.push(self.load_value(src)?);
         }
 
-        // If any of the destinations require float output, get a set of converted sources
-        // to float values only.
+        // Determine which types of outputs exist in order to calculate sums.
+        let int_outputs_exist = op_data
+            .dests
+            .iter()
+            .map(|sym| self.data.sym_pic(sym).is_ok_and(|pic| !pic.is_float()))
+            .any(|b| b);
         let float_outputs_exist = op_data
             .dests
             .iter()
             .map(|sym| self.data.sym_pic(sym).is_ok_and(|pic| pic.is_float()))
             .any(|b| b);
+
+        // If any of the destinations require float output, get a set of converted sources
+        // to float values only.
         let float_srcs = if float_outputs_exist {
             let mut out: Vec<Value> = Vec::new();
             for (i, val) in src_vals.iter().enumerate() {
-                if !op_data
-                    .sources
-                    .iter()
-                    .nth(i)
-                    .unwrap()
-                    .is_float(self.data)?
-                {
+                if !op_data.sources.iter().nth(i).unwrap().is_float(self.data)? {
                     // Convert from [`i64`] to [`f64`].
                     let fval = self.builder.ins().fcvt_from_sint(types::F64, *val);
                     out.push(fval);
@@ -76,8 +77,8 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
 
         // Combine all of the source values to get a total without including the destination.
         // We repeat this for float output if required.
-        let combined_srcs =
-            self.combine_sources_vec(src_vals, op_type, op_data.overwrite_dests, false);
+        let combined_srcs = int_outputs_exist
+            .then(|| self.combine_sources_vec(src_vals, op_type, op_data.overwrite_dests, false));
         let combined_float_srcs = float_srcs
             .map(|f_srcs| self.combine_sources_vec(f_srcs, op_type, op_data.overwrite_dests, true));
 
@@ -90,7 +91,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             let src_sum_val = if results_in_float {
                 *combined_float_srcs.as_ref().unwrap()
             } else {
-                combined_srcs
+                combined_srcs.unwrap()
             };
 
             // If the destination is non-overwrite, we need to load it once and operate on that to
@@ -210,7 +211,8 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             }
             BasicMathOp::Multiply => {
                 if is_float {
-                    self.builder.ins().fmul(left, right)
+                    let x = self.builder.ins().fmul(left, right);
+                    x
                 } else {
                     self.builder.ins().imul(left, right)
                 }

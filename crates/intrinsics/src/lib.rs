@@ -209,10 +209,31 @@ pub unsafe extern "C" fn cb_length(str: *const c_char) -> i64 {
 }
 
 /// COBOL random intrinsic.
-/// Generates a random integer and returns it.
+/// Generates a random floating point value between 0 and 1, and returns it.
+/// Adapted from the C implementation in the following article:
+/// https://www.corsix.org/content/higher-quality-random-floats
 #[no_mangle]
-pub unsafe extern "C" fn cb_random() -> i64 {
+pub unsafe extern "C" fn cb_random() -> f64 {
     static mut RNG: Lazy<SmallRng> =
         Lazy::new(|| SmallRng::seed_from_u64(unsafe { libc::time(null_mut()) } as u64));
-    RNG.next_u64() as i64
+    let x = RNG.next_u64() >> 11;
+    let mut e: u64 = 1022;
+    loop {
+        if RNG.next_u64() & 1 == 1 {
+            break;
+        }
+        e -= 1;
+        if e <= 1022 - 75 {
+            break;
+        }
+    }
+    let out = ((x + 1) >> 1) + (e << 52);
+    f64::from_ne_bytes(out.to_ne_bytes())
+}
+
+/// COBOL integer intrinsic.
+/// Converts the given float to the next highest integer.
+#[no_mangle]
+pub unsafe extern "C" fn cb_integer(f: f64) -> i64 {
+    libm::ceil(f) as i64
 }

@@ -28,7 +28,7 @@ macro_rules! tok {
     [if] => { $crate::compiler::parser::Token::If };
     [then] => { $crate::compiler::parser::Token::Then };
     [else] => { $crate::compiler::parser::Token::Else };
-    [end] => { $crate::compiler::parser::Token::End };
+    [end_if] => { $crate::compiler::parser::Token::EndIf };
     [not] => { $crate::compiler::parser::Token::Not };
     [and] => { $crate::compiler::parser::Token::And };
     [or] => { $crate::compiler::parser::Token::Or };
@@ -163,8 +163,8 @@ pub(crate) enum Token {
     Then,
     #[token("ELSE")]
     Else,
-    #[token("END")]
-    End,
+    #[token("END-IF")]
+    EndIf,
     #[token("NOT")]
     Not,
     #[token("AND")]
@@ -226,7 +226,7 @@ pub(crate) enum Token {
     // [A-Z0-9][A-Z0-9-]*[A-Z0-9]|[A-Z0-9]+
     #[regex(r#"[A-Z0-9][A-Z0-9-]+"#)]
     Identifier,
-    #[regex(r"//[^\n]*[\n]*")]
+    #[regex(r"\*>[^\n]*[\n]*")]
     SingleLineComment,
     #[regex(r"((\r)?\n)+")]
     EOL,
@@ -263,7 +263,7 @@ impl Display for Token {
             Token::If => write!(f, "IF"),
             Token::Then => write!(f, "THEN"),
             Token::Else => write!(f, "ELSE"),
-            Token::End => write!(f, "END"),
+            Token::EndIf => write!(f, "END-IF"),
             Token::Not => write!(f, "NOT"),
             Token::And => write!(f, "AND"),
             Token::Or => write!(f, "OR"),

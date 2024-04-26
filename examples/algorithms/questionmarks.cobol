@@ -41,7 +41,7 @@ PROCEDURE DIVISION.
     MOVE 0 TO NUM-SUM.
     ADD LAST-NUM OUT-NUM TO NUM-SUM.
     IF NOT LAST-NUM = -1 THEN
-        // check if this is conformant with gnucobol!
+        *> check if this is conformant with gnucobol!
         IF NUM-SUM = 10 AND NOT NUM-QMARKS = 3 THEN
             MOVE 0 TO CONFORMANT.
             MOVE INPUT-LEN TO CUR-IDX.

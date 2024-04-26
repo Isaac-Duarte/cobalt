@@ -28,8 +28,11 @@ pub(crate) enum Stat<'src> {
 
 impl<'src> Parser<'src> {
     /// Parses a single statement from the current parser position.
-    pub(super) fn stat(&mut self) -> Result<Spanned<Stat<'src>>> {
+    /// Takes whether this statement should end with a "." in addition to a newline.
+    pub(super) fn stat(&mut self, parse_dot: bool) -> Result<Spanned<Stat<'src>>> {
         let start_idx = self.peek_idx();
+
+        // Parse the statement body.
         let stat = match self.peek() {
             tok![display] => self.parse_display()?,
             tok![move] => self.parse_move()?,
@@ -53,6 +56,12 @@ impl<'src> Parser<'src> {
             }
         };
 
+        // Parse the dot (optionally) and newline out.
+        if parse_dot {
+            self.consume(tok![.])?;
+        }
+        self.consume(tok![eol])?;
+
         Ok((stat, (start_idx, self.cur_idx()).into()))
     }
 
@@ -68,7 +77,6 @@ impl<'src> Parser<'src> {
                 break;
             }
         }
-        self.consume_vec(&[tok![.], tok![eol]])?;
 
         Ok(Stat::Display(to_display))
     }
@@ -77,7 +85,6 @@ impl<'src> Parser<'src> {
     fn parse_accept(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![accept])?;
         let ident_tok = self.consume(tok![ident])?;
-        self.consume_vec(&[tok![.], tok![eol]])?;
         Ok(Stat::Accept(self.text(ident_tok)))
     }
 }
@@ -147,7 +154,6 @@ impl<'src> Parser<'src> {
             .then(|| self.parse_span())
             .transpose()?;
         let dest = MoveRef { sym, span };
-        self.consume_vec(&[tok![.], tok![eol]])?;
 
         Ok(Stat::Move(MoveData { source, dest }))
     }

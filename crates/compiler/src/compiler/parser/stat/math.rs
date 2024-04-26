@@ -26,7 +26,6 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_add(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![add])?;
         let op_data = self.parse_math_op(tok![to])?;
-        self.consume_vec(&[tok![.], tok![eol]])?;
 
         Ok(Stat::Add(op_data))
     }
@@ -35,7 +34,6 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_subtract(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![subtract])?;
         let op_data = self.parse_math_op(tok![from])?;
-        self.consume_vec(&[tok![.], tok![eol]])?;
 
         Ok(Stat::Subtract(op_data))
     }
@@ -44,7 +42,6 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_multiply(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![multiply])?;
         let op_data = self.parse_math_op(tok![by])?;
-        self.consume_vec(&[tok![.], tok![eol]])?;
 
         Ok(Stat::Multiply(op_data))
     }
@@ -150,7 +147,6 @@ impl<'src> Parser<'src> {
                 "DIVIDE statements utilising a 'BY' clause must also include a 'GIVING' clause."
             );
         };
-        self.consume_vec(&[tok![.], tok![eol]])?;
 
         // Determine which token is the dividend, and which is the divisor.
         let (dividend_tok, divisor_tok) = if left_to_right {
