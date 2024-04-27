@@ -1,11 +1,11 @@
 /target
 
 # Cargo (Rust) artifacts.
-crates/compiler/target
-crates/intrinsics/target
+crates/*/target
 
 # Build artifacts.
 /build
 
 # Cobalt output artifacts.
+/bench_out
 /out

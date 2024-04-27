@@ -1,0 +1,4 @@
+name = "Primality"
+source_file = "./examples/algorithms/primality.cobol"
+stdin = "50\n10000\n"
+iterations = 10
