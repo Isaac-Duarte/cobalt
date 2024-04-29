@@ -34,11 +34,7 @@ impl DataManager {
 
     /// Uploads all string literals, runtime variable data and other object data found
     /// within the AST as Cranelift data objects, registering them in the manager.
-    pub(super) fn upload(
-        &mut self,
-        module: &mut ObjectModule,
-        ast: &Ast<'_>,
-    ) -> Result<()> {
+    pub(super) fn upload(&mut self, module: &mut ObjectModule, ast: &Ast<'_>) -> Result<()> {
         if let Some(data_div) = ast.data_div.as_ref() {
             self.upload_vars(module, &ast.str_lits, data_div)?;
         }

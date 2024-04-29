@@ -80,7 +80,7 @@ impl TryFrom<BuildCommand> for BuildConfig {
             #[cfg(debug_assertions)]
             output_ast: cli.output_ast,
             #[cfg(debug_assertions)]
-            output_ir_regex
+            output_ir_regex,
         })
     }
 }

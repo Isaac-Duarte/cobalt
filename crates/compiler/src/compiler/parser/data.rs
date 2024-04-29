@@ -365,7 +365,8 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
     /// Verifies that the currently generated chunks are a valid PIC configuration.
     fn verify_chunks(&mut self) -> Result<()> {
         // Check for chunks which should be unique.
-        if self.chunks
+        if self
+            .chunks
             .iter()
             .filter(|c| {
                 c.chunk_type == PicChunkType::DecimalPoint
@@ -381,7 +382,8 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
         }
 
         // Check for invalid combinations of chunks.
-        if self.chunks
+        if self
+            .chunks
             .iter()
             .filter(|c| {
                 c.chunk_type == PicChunkType::Numeric
@@ -391,7 +393,8 @@ impl<'src, 'prs> PicParser<'src, 'prs> {
             })
             .count()
             > 0
-            && self.chunks
+            && self
+                .chunks
                 .iter()
                 .filter(|c| {
                     c.chunk_type == PicChunkType::Alpha

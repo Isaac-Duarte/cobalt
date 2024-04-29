@@ -61,5 +61,5 @@ pub struct BuildCommand {
     /// `cobalt::main`. Absolute start and end tokens (^|$) are implicit and not required.
     #[cfg(debug_assertions)]
     #[arg(long, value_name = "REGEX")]
-    pub output_ir_for: Option<String>
+    pub output_ir_for: Option<String>,
 }

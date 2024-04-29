@@ -4,7 +4,6 @@ use super::{Cond, Stat};
 
 use miette::Result;
 
-
 /// Available variants for a single "PERFORM" instruction.
 #[derive(Debug)]
 pub(crate) enum PerformType<'src> {
@@ -27,9 +26,7 @@ impl<'src> Parser<'src> {
         let first_para_txt = self.text(first_para_tok);
         let perform = match self.peek() {
             // PERFORM X
-            tok![.] | tok![eol] => {
-                PerformType::Single(first_para_txt)
-            }
+            tok![.] | tok![eol] => PerformType::Single(first_para_txt),
 
             // PERFORM X THRU Y
             tok![thru] => {
@@ -92,11 +89,13 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_exit(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![exit])?;
         let exit_type = match self.peek() {
-            tok![paragraph] => {
-                ExitType::Paragraph
-            },
+            tok![paragraph] => ExitType::Paragraph,
             tok => {
-                parser_bail!(self, "Expected one of: PARAGRAPH for exit statement, instead found {}.", tok);
+                parser_bail!(
+                    self,
+                    "Expected one of: PARAGRAPH for exit statement, instead found {}.",
+                    tok
+                );
             }
         };
         self.next()?;
