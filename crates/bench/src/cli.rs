@@ -14,6 +14,16 @@ pub struct Cli {
     #[arg(short = 'c', long, value_name = "COMPILER")]
     pub compiler: Option<PathBuf>,
 
+    /// The optimisation level to use when building with Cobalt.
+    /// By default, turns on maximum optimisations ("speed_and_size").
+    #[arg(short = 'O', long, value_parser = clap::builder::PossibleValuesParser::new(&["none", "speed", "speed_and_size"]))]
+    pub cobalt_opt_level: Option<String>,
+
+    /// Whether to disable generation of hardware security instructions by
+    /// Cobalt when generating benchmarking binaries.
+    #[arg(long, short = 'h', action)]
+    pub disable_hw_security: bool,
+
     /// Whether to run comparative tests against GnuCobol.
     #[arg(long, short = 'g', action)]
     pub run_comparative: bool,
@@ -65,6 +75,9 @@ impl TryInto<Cfg> for Cli {
                 cobalt_bin.to_str().unwrap()
             );
         }
+
+        // Get the optimisation level to compile at.
+        let opt_level = self.cobalt_opt_level.unwrap_or("speed_and_size".into());
 
         // If running comparative tests is enabled, ensure that GnuCobol's `cobc` is available.
         if self.run_comparative {
@@ -191,6 +204,8 @@ impl TryInto<Cfg> for Cli {
         // Build the configuration for running tests.
         Ok(Cfg {
             compiler: cobalt_bin,
+            cobalt_opt_level: opt_level,
+            disable_hw_security: self.disable_hw_security,
             run_comparative: self.run_comparative,
             output_dir,
             output_log,

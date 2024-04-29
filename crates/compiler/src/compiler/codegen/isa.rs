@@ -39,6 +39,9 @@ impl Isa {
         flag_builder.set("use_colocated_libcalls", "false").unwrap();
         flag_builder.set("is_pic", "false").unwrap();
 
+        // Set optimisation level.
+        flag_builder.set("opt_level", &cfg.opt_level).unwrap();
+
         // Add any platform-specific settings.
         match self {
             Self::x86_64 => {}

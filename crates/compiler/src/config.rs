@@ -22,6 +22,9 @@ pub(crate) struct BuildConfig {
 
     /// Whether to generate code with security features enabled.
     pub gen_security_features: bool,
+    
+    /// The optimisation level to compile at.
+    pub opt_level: String,
 
     /// Whether to output a parsed representation of the AST.
     /// Available in debug mode only.
@@ -62,6 +65,9 @@ impl TryFrom<BuildCommand> for BuildConfig {
             None => out_file.push(cli.input.file_stem().unwrap()),
         }
 
+        // Get the optimisation level to compile at.
+        let opt_level = cli.opt_level.unwrap_or("none".into());
+        
         // If there is a regex for printing IR, parse that into a [`Regex`] structure.
         #[cfg(debug_assertions)]
         let output_ir_regex = cli
@@ -77,6 +83,7 @@ impl TryFrom<BuildCommand> for BuildConfig {
             out_dir,
             out_file,
             gen_security_features: !cli.disable_security_features,
+            opt_level,
             #[cfg(debug_assertions)]
             output_ast: cli.output_ast,
             #[cfg(debug_assertions)]

@@ -44,6 +44,11 @@ pub struct BuildCommand {
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
+    /// The optimisation level to compile the provided code at.
+    /// By default, optimises for compile speed (no optimisations).
+    #[arg(short = 'O', long, value_parser = clap::builder::PossibleValuesParser::new(&["none", "speed", "speed_and_size"]))]
+    pub opt_level: Option<String>,
+
     /// Disables the generation of instructions utilising hardware security
     /// features within output binaries (e.g. PAC/BTI on aarch64).
     #[arg(long, action)]

@@ -21,6 +21,8 @@ fn main() -> miette::Result<()> {
     let log = BenchmarkLog {
         started_at,
         ended_at,
+        opt_level: cfg.cobalt_opt_level.clone(),
+        hw_security_enabled: !cfg.disable_hw_security,
         benchmarks,
     };
     log.write_to(cfg.output_log)?;

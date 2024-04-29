@@ -16,6 +16,12 @@ pub(crate) struct BenchmarkLog {
     /// The time at which the benchmarking run ended, in UTC time.
     pub ended_at: DateTime<Utc>,
 
+    /// The level of optimisations used for Cobalt.
+    pub opt_level: String,
+
+    /// Whether hardware security instructions were enabled or not.
+    pub hw_security_enabled: bool,
+
     /// Output for the benchmarks executed.
     pub benchmarks: Vec<BenchmarkExecution>,
 }

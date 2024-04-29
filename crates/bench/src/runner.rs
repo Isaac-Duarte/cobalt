@@ -8,17 +8,36 @@ use std::{
 use colored::Colorize;
 use miette::Result;
 
-use crate::{bench::Benchmark, log::{BenchmarkExecution, BenchmarkResult}};
+use crate::{
+    bench::Benchmark,
+    log::{BenchmarkExecution, BenchmarkResult},
+};
 
 /// The name of the benchmarking output binary.
 const BENCH_BIN_NAME: &str = "bench_bin";
 
 /// Configuration for executing benchmarks.
 pub(crate) struct Cfg {
+    /// The Cobalt binary to use for compilation.
     pub compiler: PathBuf,
+
+    /// The optimisation level to run Cobalt at when compiling.
+    pub cobalt_opt_level: String,
+
+    /// Whether to disable generating hardware security instructions
+    /// when compiling sources with Cobalt.
+    pub disable_hw_security: bool,
+
+    /// Whether to run comparative tests against GnuCobol's `cobc`.
     pub run_comparative: bool,
+
+    /// The output directory for benchmark artifacts.
     pub output_dir: PathBuf,
+
+    /// The file to output benchmark log information to.
     pub output_log: PathBuf,
+
+    /// The benchmarks to execute during this run.
     pub benchmarks: Vec<Benchmark>,
 }
 
@@ -40,14 +59,17 @@ pub(crate) fn run_single(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkEx
         benchmark.iterations
     );
     let cobalt_results = run_cobalt(cfg, benchmark)?;
-    let cobc_results = cfg.run_comparative.then(|| run_cobc(cfg, benchmark)).transpose()?;
+    let cobc_results = cfg
+        .run_comparative
+        .then(|| run_cobc(cfg, benchmark))
+        .transpose()?;
 
     Ok(BenchmarkExecution {
         benchmark: benchmark.clone(),
         started_at,
         ended_at: chrono::offset::Local::now().to_utc(),
         cobalt_results,
-        cobc_results
+        cobc_results,
     })
 }
 
@@ -59,8 +81,12 @@ fn run_cobalt(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
     cobalt
         .arg("build")
         .arg(&benchmark.source_file)
+        .args(["--opt-level", &cfg.cobalt_opt_level])
         .args(["--output-dir", cfg.output_dir.to_str().unwrap()])
         .args(["--output-name", BENCH_BIN_NAME]);
+    if cfg.disable_hw_security {
+        cobalt.arg("--disable-security-features");
+    }
 
     let before = Instant::now();
     for _ in 0..100 {
@@ -89,7 +115,7 @@ fn run_cobalt(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
         compile_time_total: elapsed,
         compile_time_avg: elapsed / 100,
         execute_time_total,
-        execute_time_avg
+        execute_time_avg,
     })
 }
 
@@ -130,7 +156,7 @@ fn run_cobc(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
         compile_time_total: elapsed,
         compile_time_avg: elapsed / 100,
         execute_time_total,
-        execute_time_avg
+        execute_time_avg,
     })
 }
 
