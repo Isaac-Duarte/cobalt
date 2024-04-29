@@ -3,6 +3,8 @@ use std::path::PathBuf;
 /**
  * Structures and utilities for converting parsed ASTs into Cranelift IR.
  */
+#[cfg(debug_assertions)]
+use colored::Colorize;
 use cranelift::{
     codegen::{
         ir::{AbiParam, InstBuilder},
@@ -17,7 +19,8 @@ use miette::Result;
 use crate::config::BuildConfig;
 
 use self::{
-    data::DataManager, func::FuncManager, intrinsics::IntrinsicManager, isa::Isa, translate::FuncTranslator
+    data::DataManager, func::FuncManager, intrinsics::IntrinsicManager, isa::Isa,
+    translate::FuncTranslator,
 };
 
 use super::parser::{Ast, Paragraph};
@@ -61,7 +64,7 @@ pub struct CodeGenerator<'cfg, 'src> {
 impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
     /// Creates a new code generator based on the given AST.
     pub fn new(cfg: &'cfg BuildConfig, ast: Ast<'src>) -> Result<Self> {
-        let isa = Isa::new_from_platform()?.to_cranelift_isa()?;
+        let isa = Isa::new_from_platform()?.to_cranelift_isa(cfg)?;
         let obj_builder = ObjectBuilder::new(
             isa,
             ast.ident_div.program_id,
@@ -171,8 +174,22 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
             builder.finalize();
         }
 
+        // Print the IR for this function if matched (debug mode only).
+        #[cfg(debug_assertions)]
+        if self
+            .cfg
+            .output_ir_regex
+            .as_ref()
+            .is_some_and(|r| r.is_match("cobalt::main"))
+        {
+            println!(
+                "{}{}",
+                "info(ir): Function IR for cobalt::main.\n".blue(),
+                self.ctx.func.display()
+            );
+        }
+
         // Verify that the function is valid.
-        println!("{}", self.ctx.func.display());
         verify_function(&self.ctx.func, self.module.isa())
             .map_err(|err| miette::diagnostic!("codegen: Function verification failed: {}", err))?;
 
@@ -228,8 +245,27 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
             trans.builder.finalize();
         }
 
+        // Print the IR for this function if matched (debug mode only).
+        #[cfg(debug_assertions)]
+        {
+            let func_match_name = paragraph.name.map(|n| n.0).unwrap_or("cobalt::entrypoint");
+            if self
+                .cfg
+                .output_ir_regex
+                .as_ref()
+                .is_some_and(|r| r.is_match(func_match_name))
+            {
+                println!(
+                    "{}{}{}{}",
+                    "info(ir): Function IR for ".blue(),
+                    func_match_name.blue(),
+                    ".\n".blue(),
+                    self.ctx.func.display()
+                );
+            }
+        }
+
         // Verify that the function is valid.
-        println!("{}", self.ctx.func.display());
         verify_function(&self.ctx.func, self.module.isa())
             .map_err(|err| miette::diagnostic!("codegen: Function verification failed: {}", err))?;
 

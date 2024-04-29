@@ -19,7 +19,10 @@ pub(crate) fn run_build(args: BuildCommand) -> Result<()> {
     // Perform a parse pass.
     let parser = Parser::new(cfg.input_file.to_str().unwrap(), &txt);
     let ast = parser.parse()?;
-    println!("{:#?}", ast);
+    #[cfg(debug_assertions)]
+    if cfg.output_ast {
+        println!("info(ast): {:#?}", ast);
+    }
 
     // Translate the AST into Cranelift IR.
     let mut code_gen =

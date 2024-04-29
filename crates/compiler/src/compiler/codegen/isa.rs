@@ -1,10 +1,13 @@
 use std::{env, sync::Arc};
 
+use colored::Colorize;
 use cranelift::codegen::{
     isa::TargetIsa,
     settings::{self, Configurable},
 };
 use miette::Result;
+
+use crate::config::BuildConfig;
 
 /// An abstract representation of an ISA within the Cobalt code generator.
 pub(super) enum Isa {
@@ -29,7 +32,7 @@ impl Isa {
     }
 
     /// Converts the given ISA into a Cranelift ISA structure.
-    pub(super) fn to_cranelift_isa(self) -> Result<Arc<dyn TargetIsa>> {
+    pub(super) fn to_cranelift_isa(self, cfg: &BuildConfig) -> Result<Arc<dyn TargetIsa>> {
         // Create flag builder, insert default settings.
         let mut flag_builder = settings::builder();
         let mut isa_builder = cranelift_native::builder().unwrap();
@@ -40,12 +43,17 @@ impl Isa {
         match self {
             Self::x86_64 => {}
             Self::Aarch64 => {
-                // Enable PAC-RET for all functions.
-                isa_builder.enable("sign_return_address").unwrap();
-                isa_builder.enable("sign_return_address_all").unwrap();
+                // Only enable if security features are enabled.
+                if cfg.gen_security_features {
+                    // Enable PAC-RET for all functions.
+                    isa_builder.enable("sign_return_address").unwrap();
+                    isa_builder.enable("sign_return_address_all").unwrap();
 
-                // Enable BTI.
-                isa_builder.enable("use_bti").unwrap();
+                    // Enable BTI.
+                    isa_builder.enable("use_bti").unwrap();
+                } else {
+                    println!("{}", "warn [🚧]: Hardware security instruction generation disabled for generated binaries.".yellow());
+                }
             }
         }
 

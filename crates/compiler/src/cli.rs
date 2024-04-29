@@ -27,34 +27,39 @@ pub enum Command {
 pub struct BuildCommand {
     /// The file to build.
     #[arg(value_name = "FILE")]
-    input: PathBuf,
+    pub input: PathBuf,
 
     /// The name of the output executable.
     /// By default, the primary input file name with extensions removed.
     #[arg(short, long)]
-    output_name: Option<String>,
+    pub output_name: Option<String>,
 
     /// The output directory to save to.
     /// By default, `./out`.
     #[arg(short = 'd', long, value_name = "DIR")]
-    output_dir: Option<PathBuf>,
+    pub output_dir: Option<PathBuf>,
 
     /// Set the verbosity of compiler output. Can be specified
     /// multiple times.
     #[arg(short, long, action = clap::ArgAction::Count)]
-    verbose: u8,
-}
+    pub verbose: u8,
 
-impl BuildCommand {
-    pub fn input(&self) -> &PathBuf {
-        &self.input
-    }
+    /// Disables the generation of instructions utilising hardware security
+    /// features within output binaries (e.g. PAC/BTI on aarch64).
+    #[arg(long, action)]
+    pub disable_security_features: bool,
 
-    pub fn output_name(&self) -> Option<String> {
-        self.output_name.clone()
-    }
+    /// Outputs a formatted representation of the parsed AST to console when
+    /// enabled. Useful as a debugging tool.
+    #[cfg(debug_assertions)]
+    #[arg(long, action)]
+    pub output_ast: bool,
 
-    pub fn output_dir(&self) -> Option<PathBuf> {
-        self.output_dir.clone()
-    }
+    /// Outputs an intermediate IR representation of the code for paragraphs
+    /// with names matching the given regex. For an anonymous entry paragraph,
+    /// supply the string `cobalt::entrypoint`. For the binary entrypoint, supply
+    /// `cobalt::main`. Absolute start and end tokens (^|$) are implicit and not required.
+    #[cfg(debug_assertions)]
+    #[arg(long, value_name = "REGEX")]
+    pub output_ir_for: Option<String>
 }
