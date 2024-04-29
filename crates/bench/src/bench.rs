@@ -1,12 +1,12 @@
 use std::{path::PathBuf, str::FromStr};
 
 use miette::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Represents a single benchmark to be executed by the benchmark runner.
 /// Included benchmarks are stored as `.toml` files within the `/benchmarks`
 /// directory at the root of the repository.
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct Benchmark {
     /// The display name of this benchmark.
     pub name: String,

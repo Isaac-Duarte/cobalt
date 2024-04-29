@@ -18,10 +18,20 @@ pub struct Cli {
     #[arg(long, short = 'g', action)]
     pub run_comparative: bool,
 
+    /// Whether to ignore benchmarks from the default benchmark directory.
+    /// Ignored if a benchmark directory is directly specified.
+    #[arg(long, short = 'i', action)]
+    pub ignore_default: bool,
+
     /// The output directory for testbench results.
     /// This should ideally not contain other unrelated files or folders.
     #[arg(short = 'o', long, value_name = "OUT_DIR")]
     pub output_dir: Option<PathBuf>,
+
+    /// Name of the log to output in the output directory.
+    /// By default, `bench-[timestamp].log`.
+    #[arg(short = 'l', long, value_name = "LOG_NAME")]
+    pub output_log_name: Option<String>,
 
     /// The input directory for benchmarks to run.
     /// By default, `./benchmarks`.
@@ -88,9 +98,21 @@ impl TryInto<Cfg> for Cli {
                 .map_err(|e| miette::diagnostic!("Failed to create output directory: {e}"))?;
         }
 
+        // Verify that the output log file name is a valid file name.
+        let output_log_name = sanitize_filename::sanitize(
+            self.output_log_name
+                .unwrap_or(format!("bench-{}.log", chrono::Local::now().timestamp())),
+        );
+        if output_log_name.len() == 0 {
+            miette::bail!("Output log file name ('{output_log_name}') cannot be empty or contain an invalid filename for the current platform.");
+        }
+        let mut output_log = output_dir.clone();
+        output_log.push(output_log_name);
+
         // If there's an input directory, scan it for any input benchmark `.toml` files.
         let mut benchmark_candidates: Vec<PathBuf> = Vec::new();
         let mut all_benchmarks: Vec<Benchmark> = Vec::new();
+        let add_from_folder = self.benchmark_dir.is_some() || !self.ignore_default;
         let input_dir = if let Some(input_dir) = self.benchmark_dir {
             if !input_dir.exists() {
                 miette::bail!(
@@ -104,7 +126,7 @@ impl TryInto<Cfg> for Cli {
             path.push("benchmarks");
             path
         };
-        if input_dir.exists() {
+        if input_dir.exists() && add_from_folder {
             benchmark_candidates.append(
                 &mut std::fs::read_dir(input_dir)
                     .map_err(|e| {
@@ -171,6 +193,7 @@ impl TryInto<Cfg> for Cli {
             compiler: cobalt_bin,
             run_comparative: self.run_comparative,
             output_dir,
+            output_log,
             benchmarks: all_benchmarks,
         })
     }

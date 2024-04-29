@@ -1,0 +1,4 @@
+name = "QuestionMarks"
+source_file = "./examples/algorithms/questionmarks.cobol"
+stdin = "THIS2??IS?8A?TEST?STRING?2????3TO??TEST!CONFORMANCY?7??\n"
+iterations = 1000

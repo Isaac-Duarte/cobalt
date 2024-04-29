@@ -16,5 +16,5 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 # Run the benchmarks.
 cd $SCRIPT_DIR
-cargo build --manifest-path="$SCRIPT_DIR/crates/bench/Cargo.toml"
-cargo run --manifest-path="$SCRIPT_DIR/crates/bench/Cargo.toml" -- $@
+cargo build --manifest-path="$SCRIPT_DIR/crates/bench/Cargo.toml" --release
+cargo run --manifest-path="$SCRIPT_DIR/crates/bench/Cargo.toml" --release -- $@

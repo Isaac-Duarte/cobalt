@@ -8,7 +8,7 @@ use std::{
 use colored::Colorize;
 use miette::Result;
 
-use crate::bench::Benchmark;
+use crate::{bench::Benchmark, log::{BenchmarkExecution, BenchmarkResult}};
 
 /// The name of the benchmarking output binary.
 const BENCH_BIN_NAME: &str = "bench_bin";
@@ -18,33 +18,41 @@ pub(crate) struct Cfg {
     pub compiler: PathBuf,
     pub run_comparative: bool,
     pub output_dir: PathBuf,
+    pub output_log: PathBuf,
     pub benchmarks: Vec<Benchmark>,
 }
 
 /// Runs all benchmarks specified in the provided configuration.
-pub(crate) fn run_all(cfg: &Cfg) -> Result<()> {
+pub(crate) fn run_all(cfg: &Cfg) -> Result<Vec<BenchmarkExecution>> {
+    let mut executions = Vec::new();
     for benchmark in cfg.benchmarks.iter() {
-        run_single(cfg, benchmark)?;
+        executions.push(run_single(cfg, benchmark)?);
     }
-    Ok(())
+    Ok(executions)
 }
 
 /// Executes a single benchmark.
-pub(crate) fn run_single(cfg: &Cfg, benchmark: &Benchmark) -> Result<()> {
+pub(crate) fn run_single(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkExecution> {
+    let started_at = chrono::offset::Local::now().to_utc();
     println!(
         "\n=== benchmark: {} ({} iters) === ",
         benchmark.name.as_str().bold(),
         benchmark.iterations
     );
-    run_cobalt(cfg, benchmark)?;
-    if cfg.run_comparative {
-        run_cobc(cfg, benchmark)?;
-    }
-    Ok(())
+    let cobalt_results = run_cobalt(cfg, benchmark)?;
+    let cobc_results = cfg.run_comparative.then(|| run_cobc(cfg, benchmark)).transpose()?;
+
+    Ok(BenchmarkExecution {
+        benchmark: benchmark.clone(),
+        started_at,
+        ended_at: chrono::offset::Local::now().to_utc(),
+        cobalt_results,
+        cobc_results
+    })
 }
 
 /// Executes a single benchmark using Cobalt.
-fn run_cobalt(cfg: &Cfg, benchmark: &Benchmark) -> Result<()> {
+fn run_cobalt(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
     // Build the target program with Cobalt.
     const BENCH_BIN_NAME: &str = "bench_bin";
     let mut cobalt = Command::new(cfg.compiler.to_str().unwrap());
@@ -71,16 +79,22 @@ fn run_cobalt(cfg: &Cfg, benchmark: &Benchmark) -> Result<()> {
     println!(
         "cobalt(compile): Total time {:.2?}, average/run of {:.6?}.",
         elapsed,
-        elapsed / 1000
+        elapsed / 100
     );
 
     // Run the target program.
-    run_bench_bin(cfg, benchmark)?;
-    Ok(())
+    let (execute_time_total, execute_time_avg) = run_bench_bin(cfg, benchmark)?;
+
+    Ok(BenchmarkResult {
+        compile_time_total: elapsed,
+        compile_time_avg: elapsed / 100,
+        execute_time_total,
+        execute_time_avg
+    })
 }
 
 /// Executes a single benchmark using GnuCobol's `cobc`.
-fn run_cobc(cfg: &Cfg, benchmark: &Benchmark) -> Result<()> {
+fn run_cobc(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
     // Build the target program with `cobc`.
     let mut bench_bin_path = cfg.output_dir.clone();
     bench_bin_path.push(BENCH_BIN_NAME);
@@ -106,16 +120,23 @@ fn run_cobc(cfg: &Cfg, benchmark: &Benchmark) -> Result<()> {
     println!(
         "cobc(compile): Total time {:.2?}, average/run of {:.6?}.",
         elapsed,
-        elapsed / 1000
+        elapsed / 100
     );
 
     // Run the target program.
-    run_bench_bin(cfg, benchmark)?;
-    Ok(())
+    let (execute_time_total, execute_time_avg) = run_bench_bin(cfg, benchmark)?;
+
+    Ok(BenchmarkResult {
+        compile_time_total: elapsed,
+        compile_time_avg: elapsed / 100,
+        execute_time_total,
+        execute_time_avg
+    })
 }
 
 /// Executes a single generated benchmarking binary.
-fn run_bench_bin(cfg: &Cfg, benchmark: &Benchmark) -> Result<()> {
+/// Returns the total execution time and average execution time per iteration.
+fn run_bench_bin(cfg: &Cfg, benchmark: &Benchmark) -> Result<(Duration, Duration)> {
     let mut bench_bin_path = cfg.output_dir.clone();
     bench_bin_path.push(BENCH_BIN_NAME);
 
@@ -128,9 +149,9 @@ fn run_bench_bin(cfg: &Cfg, benchmark: &Benchmark) -> Result<()> {
     println!(
         "bench(run): Total time {:.2?}, average/run of {:.6?}.",
         elapsed,
-        elapsed / 1000
+        elapsed / benchmark.iterations as u32
     );
-    Ok(())
+    Ok((elapsed, elapsed / benchmark.iterations as u32))
 }
 
 /// Executes the given binary for `iters` iterations, without passing input via. `stdin`.

@@ -1,9 +1,11 @@
 use clap::Parser;
 use cli::Cli;
+use log::BenchmarkLog;
 use runner::{run_all, Cfg};
 
 mod bench;
 mod cli;
+mod log;
 mod runner;
 
 fn main() -> miette::Result<()> {
@@ -11,7 +13,17 @@ fn main() -> miette::Result<()> {
     let cfg: Cfg = Cli::parse().try_into()?;
 
     // Run all provided tests.
-    run_all(&cfg)?;
+    let started_at = chrono::offset::Local::now().to_utc();
+    let benchmarks = run_all(&cfg)?;
+    let ended_at = chrono::offset::Local::now().to_utc();
+
+    // Output the log file.
+    let log = BenchmarkLog {
+        started_at,
+        ended_at,
+        benchmarks,
+    };
+    log.write_to(cfg.output_log)?;
 
     Ok(())
 }

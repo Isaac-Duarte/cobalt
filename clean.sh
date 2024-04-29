@@ -46,10 +46,20 @@ echo -e "${CYAN}Cleaning intrinsics library artifacts...${NC}"
 cd "${SCRIPT_DIR}/crates/intrinsics/"
 cargo clean $BUILD_PROFILE_ARG
 
+echo -e "${CYAN}Cleaning benchmark testbench artifacts...${NC}"
+cd "${SCRIPT_DIR}/crates/bench/"
+cargo clean $BUILD_PROFILE_ARG
+
 # Clean copied build artifacts in ./build.
 echo -e "${CYAN}Cleaning copied build artifacts...${NC}"
 BUILD_DIR="${SCRIPT_DIR}/build"
 rm -rf "$BUILD_DIR"
+
+# Clean generated benchmark artifacts in ./bench_out.
+echo -e "${CYAN}Cleaning generated benchmark artifacts...${NC}"
+BENCH_OUT_DIR="${SCRIPT_DIR}/bench_out"
+rm -rf $BENCH_OUT_DIR/*.o
+rm -rf $BENCH_OUT_DIR/bench_bin
 
 # Done!
 echo -e "${GREEN}Clean complete.${NC}"
