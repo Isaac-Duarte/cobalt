@@ -1,3 +1,5 @@
+use std::env;
+
 use clap::Parser;
 use cli::Cli;
 use log::BenchmarkLog;
@@ -21,6 +23,7 @@ fn main() -> miette::Result<()> {
     let log = BenchmarkLog {
         started_at,
         ended_at,
+        arch: env::consts::ARCH.into(),
         opt_level: cfg.cobalt_opt_level.clone(),
         hw_security_enabled: !cfg.disable_hw_security,
         benchmarks,

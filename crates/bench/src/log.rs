@@ -16,6 +16,9 @@ pub(crate) struct BenchmarkLog {
     /// The time at which the benchmarking run ended, in UTC time.
     pub ended_at: DateTime<Utc>,
 
+    /// The architecture on which the benchmarking was performed.
+    pub arch: String,
+
     /// The level of optimisations used for Cobalt.
     pub opt_level: String,
 
