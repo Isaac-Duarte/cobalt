@@ -29,6 +29,7 @@ pub(super) enum CobaltIntrinsic {
     PrintInt,    // void cb_print_i64(i64)
     StrCmp,      // i8 cb_strcmp(char*, char*)
     StrCpy,      // void cb_strcpy(char*, char*, i64, i64, i64, i64, i64, i64)
+    CharCpy,     // void cb_charcpy(char*, char*, i64, i64)
     ReadStr,     // void cb_readstr(char*, usize)
     ReadInt,     // i64 cb_readint()
     ReadFloat,   // f64 cb_readfloat()
@@ -107,6 +108,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::PrintInt => printint_sig(&mut sig),
             CobaltIntrinsic::StrCmp => strcmp_sig(&mut sig, module),
             CobaltIntrinsic::StrCpy => strcpy_sig(&mut sig, module),
+            CobaltIntrinsic::CharCpy => charcpy_sig(&mut sig, module),
             CobaltIntrinsic::ReadStr => readstr_sig(&mut sig, module),
             CobaltIntrinsic::ReadInt => readint_sig(&mut sig),
             CobaltIntrinsic::ReadFloat => readfloat_sig(&mut sig),
@@ -137,6 +139,7 @@ impl IntrinsicManager {
             CobaltIntrinsic::PrintInt => "cb_print_i64",
             CobaltIntrinsic::StrCmp => "cb_strcmp",
             CobaltIntrinsic::StrCpy => "cb_strcpy",
+            CobaltIntrinsic::CharCpy => "cb_charcpy",
             CobaltIntrinsic::ReadStr => "cb_readstr",
             CobaltIntrinsic::ReadInt => "cb_readint",
             CobaltIntrinsic::ReadFloat => "cb_readfloat",
@@ -203,6 +206,15 @@ fn strcpy_sig(sig: &mut Signature, module: &mut ObjectModule) {
     for _ in 0..6 {
         sig.params.push(AbiParam::new(types::I64));
     }
+}
+
+/// Generates a function signature for [`CobaltIntrinsic::CharCpy`].
+fn charcpy_sig(sig: &mut Signature, module: &mut ObjectModule) {
+    let ptr_type = module.target_config().pointer_type();
+    sig.params.push(AbiParam::new(ptr_type)); // src_str
+    sig.params.push(AbiParam::new(ptr_type)); // dest_str
+    sig.params.push(AbiParam::new(types::I64)); //src_idx
+    sig.params.push(AbiParam::new(types::I64)); //dest_idx
 }
 
 /// Generates a function signature for [`CobaltIntrinsic::ReadStr`].

@@ -65,11 +65,6 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     pub(super) fn translate_mov_lit(&mut self, lit: &Literal, dest: &MoveRef<'src>) -> Result<()> {
         let dest_id = self.data.sym_data_id(dest.sym)?;
 
-        // Import the destination variable into the function, get a pointer to it.
-        let ptr_type = self.module.target_config().pointer_type();
-        let dest_ptr = self.load_static_ptr(dest_id)?;
-        let src_val = self.load_lit(lit)?;
-
         // Load the relevant PIC, verify the destination is valid.
         let dest_pic = self.data.sym_pic(dest.sym)?.clone();
         dest.validate(&dest_pic, self.data)?;
@@ -84,8 +79,13 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             );
         }
 
+        // Import the destination variable into the function, get a pointer to it.
+        let ptr_type = self.module.target_config().pointer_type();
+        let dest_ptr = self.load_static_ptr(dest_id)?;
+
         match lit {
             Literal::Int(_) | Literal::Float(_) => {
+                let src_val = self.load_lit(lit)?;
                 self.builder
                     .ins()
                     .store(MemFlags::new(), src_val, dest_ptr, Offset32::new(0));
@@ -106,49 +106,77 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
                 // We take one here to remove the null terminator.
                 let dest_len = dest_pic.comp_size() - 1;
 
-                // Check if there's a span, if there's no span we can just use a standard memcpy.
-                if let Some(span) = &dest.span {
-                    // Load the requisite arguments for the strcpy intrinsic.
-                    let src_span_idx = self.builder.ins().iconst(types::I64, 0);
-                    let src_span_len = self.builder.ins().iconst(types::I64, src_len as i64);
-                    let (dest_span_idx, dest_span_len) = self.load_span(&dest_pic, Some(span))?;
-                    let dest_len_val = self.builder.ins().iconst(types::I64, dest_len as i64);
-
-                    // Call the intrinsic.
-                    let strcpy_ref = self.intrinsics.get_ref(
-                        self.module,
-                        self.builder.func,
-                        CobaltIntrinsic::StrCpy,
-                    )?;
-                    self.builder.ins().call(
-                        strcpy_ref,
-                        &[
-                            src_val,
-                            dest_ptr,
-                            src_span_len,
-                            dest_len_val,
-                            src_span_idx,
-                            src_span_len,
-                            dest_span_idx,
-                            dest_span_len,
-                        ],
-                    );
+                // If the destination length is only a single character, we can use an optimised single store.
+                // Since it's a literal, we can even skip the load half altogether and use an immediate.
+                if dest_len == 1 {
+                    let char = self.ast.str_lits.get(*sid).unwrap().chars().next().unwrap();
+                    let char_val = self.load_cg_lit(&CodegenLiteral::Char(char))?;
+                    self.builder
+                        .ins()
+                        .store(MemFlags::new(), char_val, dest_ptr, Offset32::new(0));
                 } else {
-                    // No span found, just use a simple memcpy.
-                    let src_size = src_len + 1; // +1 for the null terminator
-                    let size_val = self.builder.ins().iconst(ptr_type, src_size as i64);
+                    // Load source literal for copying.
+                    let src_val = self.load_lit(lit)?;
 
-                    // Sanity check.
-                    assert!(src_size <= dest_pic.comp_size());
-                    self.builder.call_memcpy(
-                        self.module.target_config(),
-                        dest_ptr,
-                        src_val,
-                        size_val,
-                    );
+                    // Cannot optimise to a single store.
+                    // Check if there's a span, if there's no span we can just use a standard memcpy.
+                    if let Some(span) = &dest.span {
+                        self.translate_mov_lit_spanned(
+                            src_val, src_len, &dest_pic, &span, dest_len, dest_ptr,
+                        )?;
+                    } else {
+                        // No span found, just use a simple memcpy.
+                        let src_size = src_len + 1; // +1 for the null terminator
+                        let size_val = self.builder.ins().iconst(ptr_type, src_size as i64);
+
+                        // Sanity check.
+                        assert!(src_size <= dest_pic.comp_size());
+                        self.builder.call_memcpy(
+                            self.module.target_config(),
+                            dest_ptr,
+                            src_val,
+                            size_val,
+                        );
+                    }
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Translates the move of a string literal into a spanned destination.
+    fn translate_mov_lit_spanned(
+        &mut self,
+        src_val: Value,
+        src_len: usize,
+        dest_pic: &Pic,
+        dest_span: &MoveSpan<'src>,
+        dest_len: usize,
+        dest_ptr: Value,
+    ) -> Result<()> {
+        // Load the requisite arguments for the strcpy intrinsic.
+        let src_span_idx = self.builder.ins().iconst(types::I64, 0);
+        let src_span_len = self.builder.ins().iconst(types::I64, src_len as i64);
+        let (dest_span_idx, dest_span_len) = self.load_span(&dest_pic, Some(dest_span))?;
+        let dest_len_val = self.builder.ins().iconst(types::I64, dest_len as i64);
+
+        // Call the intrinsic.
+        let strcpy_ref =
+            self.intrinsics
+                .get_ref(self.module, self.builder.func, CobaltIntrinsic::StrCpy)?;
+        self.builder.ins().call(
+            strcpy_ref,
+            &[
+                src_val,
+                dest_ptr,
+                src_span_len,
+                dest_len_val,
+                src_span_idx,
+                src_span_len,
+                dest_span_idx,
+                dest_span_len,
+            ],
+        );
         Ok(())
     }
 
@@ -184,54 +212,42 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         // Based on the source type, determine the copy mechanism.
         if src_pic.is_str() {
             if src.span.is_some() || dest.span.is_some() {
-                // Spans specified, we will need to use the Cobalt `strcpy` intrinsic.
-                // Get the span to copy from the source, destination.
-                let (src_span_idx, src_span_len) = self.load_span(&src_pic, src.span.as_ref())?;
-                let (dest_span_idx, dest_span_len) =
-                    self.load_span(&dest_pic, dest.span.as_ref())?;
-
-                // Load the length of both strings for the intrinsic.
-                let src_len = self
-                    .builder
-                    .ins()
-                    .iconst(types::I64, src_pic.comp_size() as i64);
-                let dest_len = self
-                    .builder
-                    .ins()
-                    .iconst(types::I64, dest_pic.comp_size() as i64);
-
-                // Call the intrinsic.
-                let strcpy_ref = self.intrinsics.get_ref(
-                    self.module,
-                    self.builder.func,
-                    CobaltIntrinsic::StrCpy,
-                )?;
-                self.builder.ins().call(
-                    strcpy_ref,
-                    &[
-                        src_ptr,
-                        dest_ptr,
-                        src_len,
-                        dest_len,
-                        src_span_idx,
-                        src_span_len,
-                        dest_span_idx,
-                        dest_span_len,
-                    ],
-                );
+                // Requires a spanned copy. If we can make an optimised load/store move, (e.g. the src/dest is only 1 character)
+                // do that instead. Currently, we can only perform this when the destination is also 1 character long (2 bytes)
+                // as we haven't got the infra for adjusting the terminator when optimising like this.
+                if (src.has_static_length_of(1) || dest.has_static_length_of(1))
+                    && dest_pic.comp_size() == 2
+                {
+                    self.translate_mov_char(src, dest, src_ptr, dest_ptr)?;
+                } else {
+                    // Cannot optimise to store/load, call the standard intrinsic.
+                    self.translate_mov_ref_spanned(
+                        src, dest, &src_pic, &dest_pic, src_ptr, dest_ptr,
+                    )?;
+                }
             } else {
                 // No spans specified, a simple copy is fine.
-                let size_val = self
-                    .builder
-                    .ins()
-                    .iconst(ptr_type, src_pic.comp_size() as i64);
+                // If the destination happens to be a single character long (2 bytes), we can also optimise down to a load/store.
+                if dest_pic.comp_size() == 2 {
+                    self.translate_mov_char(src, dest, src_ptr, dest_ptr)?;
+                } else {
+                    // Cannot optimise, perform a standard memcpy().
+                    let size_val = self
+                        .builder
+                        .ins()
+                        .iconst(ptr_type, src_pic.comp_size() as i64);
 
-                // Sanity check.
-                assert!(src_pic.comp_size() <= dest_pic.comp_size());
+                    // Sanity check.
+                    assert!(src_pic.comp_size() <= dest_pic.comp_size());
 
-                // Perform a memcpy().
-                self.builder
-                    .call_memcpy(self.module.target_config(), dest_ptr, src_ptr, size_val);
+                    // Perform a memcpy().
+                    self.builder.call_memcpy(
+                        self.module.target_config(),
+                        dest_ptr,
+                        src_ptr,
+                        size_val,
+                    );
+                }
             }
         } else if src_pic.is_float() {
             // Load & then re-store the float.
@@ -255,12 +271,95 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         Ok(())
     }
 
+    /// Attempts to translate a single character spanned move of a string variable into an
+    /// optimised set of load/store instructions. Assumes no terminator adjustments are
+    /// required post-copy.
+    fn translate_mov_char(
+        &mut self,
+        src: &MoveRef<'src>,
+        dest: &MoveRef<'src>,
+        src_ptr: Value,
+        dest_ptr: Value,
+    ) -> Result<()> {
+        // Load the adjusted source, destination address.
+        let src_offset = if let Some(span) = &src.span {
+            let offset = self.load_value(&span.start_idx)?;
+            // Indices start at 1... thanks COBOL.
+            self.builder.ins().iadd_imm(offset, -1)
+        } else {
+            self.load_cg_lit(&CodegenLiteral::Int(0))?
+        };
+        let dest_offset = if let Some(span) = &dest.span {
+            let offset = self.load_value(&span.start_idx)?;
+            // Indices start at 1... thanks COBOL.
+            self.builder.ins().iadd_imm(offset, -1)
+        } else {
+            self.load_cg_lit(&CodegenLiteral::Int(0))?
+        };
+
+        // Perform a load from source, store result in destination.
+        let charcpy_ref =
+            self.intrinsics
+                .get_ref(self.module, self.builder.func, CobaltIntrinsic::CharCpy)?;
+        self.builder
+            .ins()
+            .call(charcpy_ref, &[src_ptr, dest_ptr, src_offset, dest_offset]);
+        Ok(())
+    }
+
+    /// Translates a single spanned move of a string variable into another string variable.
+    /// Utilises the Cobalt `strcpy` intrinsic.
+    fn translate_mov_ref_spanned(
+        &mut self,
+        src: &MoveRef<'src>,
+        dest: &MoveRef<'src>,
+        src_pic: &Pic,
+        dest_pic: &Pic,
+        src_ptr: Value,
+        dest_ptr: Value,
+    ) -> Result<()> {
+        // Get the span to copy from the source, destination.
+        let (src_span_idx, src_span_len) = self.load_span(&src_pic, src.span.as_ref())?;
+        let (dest_span_idx, dest_span_len) = self.load_span(&dest_pic, dest.span.as_ref())?;
+
+        // Load the length of both strings for the intrinsic.
+        let src_len = self
+            .builder
+            .ins()
+            .iconst(types::I64, src_pic.comp_size() as i64);
+        let dest_len = self
+            .builder
+            .ins()
+            .iconst(types::I64, dest_pic.comp_size() as i64);
+
+        // Call the intrinsic.
+        let strcpy_ref =
+            self.intrinsics
+                .get_ref(self.module, self.builder.func, CobaltIntrinsic::StrCpy)?;
+        self.builder.ins().call(
+            strcpy_ref,
+            &[
+                src_ptr,
+                dest_ptr,
+                src_len,
+                dest_len,
+                src_span_idx,
+                src_span_len,
+                dest_span_idx,
+                dest_span_len,
+            ],
+        );
+        Ok(())
+    }
+
     /// Loads a single [`MoveSpan`] for the given variable into the function.
     /// If no span is provided, creates a default span targeting the entire string.
     fn load_span(&mut self, pic: &Pic, span: Option<&MoveSpan<'src>>) -> Result<(Value, Value)> {
         let ptr_type = self.module.target_config().pointer_type();
         if let Some(span) = &span {
-            let idx = self.load_value(&span.start_idx)?;
+            let mut idx = self.load_value(&span.start_idx)?;
+            // Indices begin at 1 in COBOL, so we need to step down here.
+            idx = self.builder.ins().iadd_imm(idx, -1);
             let len = if let Some(len) = &span.len {
                 self.load_value(len)?
             } else {
@@ -342,6 +441,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         // No, we still need to load it first.
         let cglitv = match cglit {
             CodegenLiteral::Char(c) => self.builder.ins().iconst(types::I8, (*c as u8) as i64),
+            CodegenLiteral::Int(i) => self.builder.ins().iconst(types::I64, *i),
         };
         self.values.insert_cg_litv(cglit, cglitv)?;
         Ok(cglitv)
@@ -398,5 +498,19 @@ impl<'src> MoveRef<'src> {
             }
         }
         Ok(())
+    }
+
+    /// Checks whether this move reference can be statically analysed as always having
+    /// a given length.
+    fn has_static_length_of(&self, len: i64) -> bool {
+        self.span.as_ref().is_some_and(|s| {
+            s.len.as_ref().is_some_and(|l| match l {
+                parser::Value::Variable(_) => false,
+                parser::Value::Literal(l) => match l {
+                    Literal::Int(i) => *i == len,
+                    _ => false,
+                },
+            })
+        })
     }
 }

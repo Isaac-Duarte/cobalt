@@ -2,4 +2,4 @@ name = "Fibonacci"
 source_file = "./examples/algorithms/fibonacci.cobol"
 # The 93rd fibonacci number is the largest that can fit within a 64-bit integer.
 stdin = "93\n"
-iterations = 1000
+iterations = 10000

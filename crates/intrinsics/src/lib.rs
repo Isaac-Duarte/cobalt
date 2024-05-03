@@ -138,6 +138,24 @@ pub unsafe extern "C" fn cb_strcpy(
     }
 }
 
+/// Copies a single character from the given source to the given destination.
+/// Assumes that the source and destination are at least 1 character long and possibly overlap.
+#[no_mangle]
+pub unsafe extern "C" fn cb_charcpy(
+    src_str: *const c_char,
+    dest_str: *mut c_char,
+    src_idx: i64,
+    dest_idx: i64,
+) {
+    if src_idx < 0 || dest_idx < 0 {
+        panic!(
+            "Source ({}) or destination ({}) index for character copy contains out of bounds accesses.",
+            src_idx, dest_idx
+        );
+    }
+    *dest_str.add(dest_idx as usize) = *src_str.add(src_idx as usize);
+}
+
 /// Reads a single line from the console, copying the data into the given buffer.
 /// The length of this buffer must be provided.
 #[no_mangle]

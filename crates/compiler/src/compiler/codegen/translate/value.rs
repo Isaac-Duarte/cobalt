@@ -13,12 +13,14 @@ use crate::compiler::parser::Literal;
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum CodegenLiteral {
     Char(char),
+    Int(i64),
 }
 
 impl Display for CodegenLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Char(c) => f.write_char(*c),
+            Self::Int(i) => f.write_str(&format!("{i}")),
         }
     }
 }
