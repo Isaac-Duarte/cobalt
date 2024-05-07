@@ -15,6 +15,11 @@ pub(crate) struct IdentDiv<'src> {
 impl<'src> Parser<'src> {
     /// Parses an identification division from COBOL tokens.
     pub(super) fn ident_div(&mut self) -> Result<IdentDiv<'src>> {
+        // Consume any leading whitespace.
+        if self.peek() == tok![eol] {
+            self.next()?;
+        }
+
         // Parse header.
         self.consume_vec(&[tok![ident_div], tok![.], tok![eol]])?;
 

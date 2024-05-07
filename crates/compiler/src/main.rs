@@ -7,6 +7,9 @@ mod compiler;
 mod config;
 mod linker;
 
+#[cfg(test)]
+mod tests;
+
 fn main() -> miette::Result<()> {
     let cli = cli::Cli::parse();
     match cli.command() {
