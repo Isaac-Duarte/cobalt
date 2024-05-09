@@ -104,6 +104,7 @@ impl CommonTestRunner {
             input_file: PathBuf::from_str(&self.name).unwrap(),
             out_dir: out_dir.clone(),
             out_file,
+            use_platform_linker: false,
             gen_security_features: true,
             opt_level: "none".into(),
             output_ast: false,

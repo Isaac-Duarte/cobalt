@@ -7,6 +7,8 @@ use std::process::Command;
 
 use miette::Result;
 
+use crate::config::BuildConfig;
+
 /// Platform-specific linker configuration options.
 /// Typically auto-detected from the host machine.
 pub(super) struct PlatformConfig {
@@ -42,11 +44,11 @@ impl LinkerType {
 
 impl PlatformConfig {
     /// Auto-detects the platform linker configuration from the host machine's setup.
-    pub(super) fn new() -> Result<Self> {
+    pub(super) fn new(cfg: &BuildConfig) -> Result<Self> {
         if env::consts::ARCH == "x86_64" && env::consts::OS == "linux" {
-            Self::detect_linux_x64()
+            Self::detect_linux_x64(cfg)
         } else if env::consts::ARCH == "aarch64" && env::consts::OS == "linux" {
-            Self::detect_linux_aarch64()
+            Self::detect_linux_aarch64(cfg)
         } else {
             miette::bail!(
                 "Unsupported platform/architecture ({}, {}) for linker.",
@@ -73,7 +75,7 @@ impl PlatformConfig {
     }
 
     /// Detects the linker configuration for an x86_64 Linux host.
-    fn detect_linux_x64() -> Result<Self> {
+    fn detect_linux_x64(cfg: &BuildConfig) -> Result<Self> {
         // Sanity check that the crt, loader exist.
         let crt = PathBuf::from("/usr/lib/x86_64-linux-gnu/crt1.o");
         let loader = PathBuf::from("/lib64/ld-linux-x86-64.so.2");
@@ -91,7 +93,7 @@ impl PlatformConfig {
         }
 
         Ok(PlatformConfig {
-            linker_type: Self::detect_best_linker(),
+            linker_type: Self::detect_best_linker(cfg),
             crt1_o: crt,
             dyn_linker: Some(loader),
             lib_paths: Vec::new(),
@@ -99,7 +101,7 @@ impl PlatformConfig {
     }
 
     /// Detects the linker configuration for an aarch64 Linux host.
-    fn detect_linux_aarch64() -> Result<Self> {
+    fn detect_linux_aarch64(cfg: &BuildConfig) -> Result<Self> {
         // Sanity check that the crt, loader exist.
         let crt = PathBuf::from("/usr/lib64/crt1.o");
         let loader = PathBuf::from("/usr/lib/ld-linux-aarch64.so.1");
@@ -117,7 +119,7 @@ impl PlatformConfig {
         }
 
         Ok(PlatformConfig {
-            linker_type: Self::detect_best_linker(),
+            linker_type: Self::detect_best_linker(cfg),
             crt1_o: crt,
             dyn_linker: Some(loader),
             lib_paths: Vec::new(),
@@ -125,7 +127,12 @@ impl PlatformConfig {
     }
 
     /// Detects the best linker for use on the host system.
-    fn detect_best_linker() -> LinkerType {
+    fn detect_best_linker(cfg: &BuildConfig) -> LinkerType {
+        // If we need to always prefer the platform linker, we're done.
+        if cfg.use_platform_linker {
+            return LinkerType::GnuLd;
+        }
+
         // If `mold` is present, use that instead for increased performance.
         if Command::new("mold").spawn().is_ok() {
             LinkerType::Mold

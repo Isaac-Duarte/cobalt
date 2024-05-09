@@ -49,6 +49,10 @@ pub struct BuildCommand {
     #[arg(short = 'O', long, value_parser = clap::builder::PossibleValuesParser::new(&["none", "speed", "speed_and_size"]))]
     pub opt_level: Option<String>,
 
+    /// Actively selects the platform linker over other available linkers.
+    #[arg(short = 'p', long, action)]
+    pub prefer_platform_linker: bool,
+
     /// Disables the generation of instructions utilising hardware security
     /// features within output binaries (e.g. PAC/BTI on aarch64).
     #[arg(long, action)]

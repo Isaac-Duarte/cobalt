@@ -30,7 +30,7 @@ impl<'cfg> Linker<'cfg> {
         Ok(Linker {
             cfg,
             user_objects: Vec::new(),
-            platform_config: PlatformConfig::new()?,
+            platform_config: PlatformConfig::new(cfg)?,
         })
     }
 

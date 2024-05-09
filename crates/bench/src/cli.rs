@@ -24,6 +24,11 @@ pub struct Cli {
     #[arg(short = 'C', long, default_value_t = 3)]
     pub cobc_opt_level: u8,
 
+    /// Whether to force usage of the platform linker over other available
+    /// linkers when compiling with Cobalt.
+    #[arg(long, short = 'f', action)]
+    pub force_platform_linker: bool,
+
     /// Whether to disable generation of hardware security instructions by
     /// Cobalt when generating benchmarking binaries.
     #[arg(long, short = 'h', action)]
@@ -215,6 +220,7 @@ impl TryInto<Cfg> for Cli {
             compiler: cobalt_bin,
             cobalt_opt_level: opt_level,
             cobc_opt_level: self.cobc_opt_level,
+            cobc_force_platform_linker: self.force_platform_linker,
             disable_hw_security: self.disable_hw_security,
             run_comparative: self.run_comparative,
             build_only: self.build_only,

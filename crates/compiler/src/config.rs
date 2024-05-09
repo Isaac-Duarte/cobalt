@@ -20,6 +20,9 @@ pub(crate) struct BuildConfig {
     /// The output linked executable file for this build.
     pub out_file: PathBuf,
 
+    /// Whether to use the platform linker over all others.
+    pub use_platform_linker: bool,
+
     /// Whether to generate code with security features enabled.
     pub gen_security_features: bool,
     
@@ -82,6 +85,7 @@ impl TryFrom<BuildCommand> for BuildConfig {
             input_file: cli.input.clone(),
             out_dir,
             out_file,
+            use_platform_linker: cli.prefer_platform_linker,
             gen_security_features: !cli.disable_security_features,
             opt_level,
             #[cfg(debug_assertions)]

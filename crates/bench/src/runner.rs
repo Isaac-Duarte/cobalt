@@ -27,6 +27,9 @@ pub(crate) struct Cfg {
     /// The optimisation level to run `cobc` at when compiling.
     pub cobc_opt_level: u8,
 
+    /// Whether to force use of the platform linker when using `cobc`.
+    pub cobc_force_platform_linker: bool,
+
     /// Whether to disable generating hardware security instructions
     /// when compiling sources with Cobalt.
     pub disable_hw_security: bool,
@@ -90,6 +93,9 @@ fn run_cobalt(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
         .args(["--opt-level", &cfg.cobalt_opt_level])
         .args(["--output-dir", cfg.output_dir.to_str().unwrap()])
         .args(["--output-name", BENCH_BIN_NAME]);
+    if cfg.cobc_force_platform_linker {
+        cobalt.arg("--prefer-platform-linker");
+    }
     if cfg.disable_hw_security {
         cobalt.arg("--disable-security-features");
     }
@@ -167,7 +173,7 @@ fn run_cobc(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
     } else {
         (None, None)
     };
-    
+
     Ok(BenchmarkResult {
         compile_time_total: elapsed,
         compile_time_avg: elapsed / 100,
