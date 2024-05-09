@@ -24,12 +24,18 @@ pub(crate) struct Cfg {
     /// The optimisation level to run Cobalt at when compiling.
     pub cobalt_opt_level: String,
 
+    /// The optimisation level to run `cobc` at when compiling.
+    pub cobc_opt_level: u8,
+
     /// Whether to disable generating hardware security instructions
     /// when compiling sources with Cobalt.
     pub disable_hw_security: bool,
 
     /// Whether to run comparative tests against GnuCobol's `cobc`.
     pub run_comparative: bool,
+
+    /// Whether to only build and not execute benchmarks.
+    pub build_only: bool,
 
     /// The output directory for benchmark artifacts.
     pub output_dir: PathBuf,
@@ -109,7 +115,12 @@ fn run_cobalt(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
     );
 
     // Run the target program.
-    let (execute_time_total, execute_time_avg) = run_bench_bin(cfg, benchmark)?;
+    let (execute_time_total, execute_time_avg) = if !cfg.build_only {
+        let (x, y) = run_bench_bin(cfg, benchmark)?;
+        (Some(x), Some(y))
+    } else {
+        (None, None)
+    };
 
     Ok(BenchmarkResult {
         compile_time_total: elapsed,
@@ -125,7 +136,7 @@ fn run_cobc(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
     let mut bench_bin_path = cfg.output_dir.clone();
     bench_bin_path.push(BENCH_BIN_NAME);
     let mut cobc = Command::new("cobc");
-    cobc.args(["-x", "-O3", "-free"])
+    cobc.args(["-x", &format!("-O{}", cfg.cobc_opt_level), "-free"])
         .args(["-o", bench_bin_path.to_str().unwrap()])
         .arg(&benchmark.source_file);
 
@@ -150,8 +161,13 @@ fn run_cobc(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
     );
 
     // Run the target program.
-    let (execute_time_total, execute_time_avg) = run_bench_bin(cfg, benchmark)?;
-
+    let (execute_time_total, execute_time_avg) = if !cfg.build_only {
+        let (x, y) = run_bench_bin(cfg, benchmark)?;
+        (Some(x), Some(y))
+    } else {
+        (None, None)
+    };
+    
     Ok(BenchmarkResult {
         compile_time_total: elapsed,
         compile_time_avg: elapsed / 100,

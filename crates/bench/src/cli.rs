@@ -19,6 +19,11 @@ pub struct Cli {
     #[arg(short = 'O', long, value_parser = clap::builder::PossibleValuesParser::new(&["none", "speed", "speed_and_size"]))]
     pub cobalt_opt_level: Option<String>,
 
+    /// The optimisation level to use when building with `cobc`.
+    /// By default, turns on all optimisations (-O3).
+    #[arg(short = 'C', long, default_value_t = 3)]
+    pub cobc_opt_level: u8,
+
     /// Whether to disable generation of hardware security instructions by
     /// Cobalt when generating benchmarking binaries.
     #[arg(long, short = 'h', action)]
@@ -27,6 +32,10 @@ pub struct Cli {
     /// Whether to run comparative tests against GnuCobol.
     #[arg(long, short = 'g', action)]
     pub run_comparative: bool,
+
+    /// Whether to run only a build test and not execute benchmarks.
+    #[arg(long, short = 'g', action)]
+    pub build_only: bool,
 
     /// Whether to ignore benchmarks from the default benchmark directory.
     /// Ignored if a benchmark directory is directly specified.
@@ -205,8 +214,10 @@ impl TryInto<Cfg> for Cli {
         Ok(Cfg {
             compiler: cobalt_bin,
             cobalt_opt_level: opt_level,
+            cobc_opt_level: self.cobc_opt_level,
             disable_hw_security: self.disable_hw_security,
             run_comparative: self.run_comparative,
+            build_only: self.build_only,
             output_dir,
             output_log,
             benchmarks: all_benchmarks,

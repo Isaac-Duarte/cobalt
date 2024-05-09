@@ -83,9 +83,10 @@ pub(crate) struct BenchmarkResult {
     pub compile_time_avg: Duration,
 
     /// The time taken to execute the benchmark for the specified
-    /// iterations.
-    pub execute_time_total: Duration,
+    /// iterations. Not present if no execution was performed.
+    pub execute_time_total: Option<Duration>,
 
     /// The time taken to execute the benchmark once, on average.
-    pub execute_time_avg: Duration,
+    /// Not present if no execution was performed.
+    pub execute_time_avg: Option<Duration>,
 }
