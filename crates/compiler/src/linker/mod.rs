@@ -2,13 +2,13 @@
  * Structures for linking a final executable from one (or more)
  * compiled object files.
  */
-use std::{path::PathBuf, process::Command};
+use std::{env, path::PathBuf, process::Command};
 
 use miette::Result;
 
 use crate::config::BuildConfig;
 
-use self::platform::PlatformConfig;
+use self::platform::{LinkerType, PlatformConfig};
 
 mod platform;
 
@@ -46,8 +46,20 @@ impl<'cfg> Linker<'cfg> {
             miette::bail!("linker: No user objects specified.");
         }
 
-        // Create initial `ld` command setup, specify output file name.
-        let mut ld = Command::new("ld");
+        // Create initial linker command based on platform.
+        let mut ld = Command::new(self.platform_config.linker_type().to_binary_name());
+
+        // If this is mold, we always need to specify a target.
+        if let LinkerType::Mold = self.platform_config.linker_type() {
+            let mold_target = match env::consts::ARCH {
+                "x86_64" => "elf_x86_64",
+                "aarch64" => "aarch64linux",
+                _ => unreachable!()
+            };
+            ld.arg(&format!("-m{mold_target}"));
+        }
+        
+        // Specify output executable name.
         ld.arg("-o").arg(&self.cfg.out_file);
 
         // Linker files, in order.
@@ -67,6 +79,13 @@ impl<'cfg> Linker<'cfg> {
         cur_dir.pop();
         ld.arg(format!("-L{}", cur_dir.to_str().unwrap()));
 
+        // If we're using mold, we need to specify "default" search paths too.
+        if let LinkerType::Mold = self.platform_config.linker_type() {
+            ld.arg("-L/lib/");
+            ld.arg("-L/lib64/");
+            ld.arg("-L/usr/lib/");
+        }
+
         // Additional library search paths.
         for lib_path in self.platform_config.lib_paths() {
             ld.arg(format!("-L{}", lib_path.to_str().unwrap()));
@@ -79,8 +98,8 @@ impl<'cfg> Linker<'cfg> {
             }
             None => {}
         }
-
-        // Execute the `ld` command.
+        
+        // Execute the linker command.
         let output = ld.output().expect("failed to execute linker");
         if !output.status.success() {
             miette::bail!("linker: {}", String::from_utf8_lossy(&output.stderr));

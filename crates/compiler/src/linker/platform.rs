@@ -3,12 +3,17 @@ use std::env;
  * Helpers for platform-specific linker options.
  */
 use std::path::PathBuf;
+use std::process::Command;
 
 use miette::Result;
 
 /// Platform-specific linker configuration options.
 /// Typically auto-detected from the host machine.
 pub(super) struct PlatformConfig {
+    /// The platform linker to use.
+    /// Typically GNU `ld`, however other linkers are supported.
+    linker_type: LinkerType,
+
     /// Location of this platform's relevant `crt1.o` object file.
     crt1_o: PathBuf,
 
@@ -17,6 +22,22 @@ pub(super) struct PlatformConfig {
 
     /// Additional library paths that should be searched for this platform config.
     lib_paths: Vec<PathBuf>,
+}
+
+/// Represents the type of linker to be used for a given platform.
+pub(super) enum LinkerType {
+    GnuLd,
+    Mold,
+}
+
+impl LinkerType {
+    /// Returns the binary name for the given linker type.
+    pub fn to_binary_name(&self) -> &str {
+        match self {
+            Self::GnuLd => "ld",
+            Self::Mold => "mold",
+        }
+    }
 }
 
 impl PlatformConfig {
@@ -33,6 +54,10 @@ impl PlatformConfig {
                 env::consts::ARCH
             );
         }
+    }
+
+    pub fn linker_type(&self) -> &LinkerType {
+        &self.linker_type
     }
 
     pub fn crt1_o(&self) -> &PathBuf {
@@ -66,6 +91,7 @@ impl PlatformConfig {
         }
 
         Ok(PlatformConfig {
+            linker_type: Self::detect_best_linker(),
             crt1_o: crt,
             dyn_linker: Some(loader),
             lib_paths: Vec::new(),
@@ -91,9 +117,21 @@ impl PlatformConfig {
         }
 
         Ok(PlatformConfig {
+            linker_type: Self::detect_best_linker(),
             crt1_o: crt,
             dyn_linker: Some(loader),
             lib_paths: Vec::new(),
         })
+    }
+
+    /// Detects the best linker for use on the host system.
+    fn detect_best_linker() -> LinkerType {
+        // If `mold` is present, use that instead for increased performance.
+        if Command::new("mold").spawn().is_ok() {
+            LinkerType::Mold
+        } else {
+            // Not present, fall back to platform linker.
+            LinkerType::GnuLd
+        }
     }
 }
