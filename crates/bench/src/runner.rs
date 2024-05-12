@@ -7,6 +7,7 @@ use std::{
 
 use colored::Colorize;
 use miette::Result;
+use regex::Regex;
 
 use crate::{
     bench::Benchmark,
@@ -36,6 +37,9 @@ pub(crate) struct Cfg {
 
     /// Whether to run comparative tests against GnuCobol's `cobc`.
     pub run_comparative: bool,
+
+    /// Whether to run comparative tests against `cobc` -> `clang`.
+    pub run_clang: bool,
 
     /// Whether to only build and not execute benchmarks.
     pub build_only: bool,
@@ -72,6 +76,10 @@ pub(crate) fn run_single(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkEx
         .run_comparative
         .then(|| run_cobc(cfg, benchmark))
         .transpose()?;
+    let clang_results = cfg
+        .run_clang
+        .then(|| run_clang(cfg, benchmark))
+        .transpose()?;
 
     Ok(BenchmarkExecution {
         benchmark: benchmark.clone(),
@@ -79,6 +87,7 @@ pub(crate) fn run_single(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkEx
         ended_at: chrono::offset::Local::now().to_utc(),
         cobalt_results,
         cobc_results,
+        clang_results,
     })
 }
 
@@ -180,6 +189,122 @@ fn run_cobc(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
         execute_time_total,
         execute_time_avg,
     })
+}
+
+/// Executes a single benchmark using GnuCobol's `cobc`'s C output followed by
+/// binary generation using `clang`.
+fn run_clang(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkResult> {
+    // Calculate output file locations for benchmarking binary, C file.
+    // We also need a bootstrapping file for `main` since GnuCobol doesn't create
+    // one for us.
+    let mut bench_bin_path = cfg.output_dir.clone();
+    bench_bin_path.push(BENCH_BIN_NAME);
+    let mut bench_c_path = cfg.output_dir.clone();
+    bench_c_path.push(format!("{}.c", &benchmark.name));
+    let mut bootstrap_path = cfg.output_dir.clone();
+    bootstrap_path.push("bootstrap.c");
+
+    // Set up commands for transpiling then compiling from C.
+    let mut cobc = Command::new("cobc");
+    cobc.args(["-C", &format!("-O{}", cfg.cobc_opt_level), "-free"])
+        // Required to generate `cob_init()` in the transpiled C.
+        .arg("-fimplicit-init")
+        .args(["-o", bench_c_path.to_str().unwrap()])
+        .arg(&benchmark.source_file);
+    let mut clang = Command::new("clang");
+    clang
+        .args(["-lcob", &format!("-O{}", cfg.cobc_opt_level)])
+        .args(["-o", bench_bin_path.to_str().unwrap()])
+        .arg(bootstrap_path.to_str().unwrap());
+
+    // We require the program ID of the COBOL file to generate the bootstrapper.
+    // Attempt to grep for that from the source.
+    let bench_prog_func = fetch_program_func(benchmark)?;
+
+    // Generate the bootstrapping file.
+    let bootstrapper = format!(
+        "
+        #include \"{}.c\"
+        int main(void) {{
+            {}();
+        }}
+    ",
+        &benchmark.name, bench_prog_func
+    );
+    std::fs::write(bootstrap_path.clone(), bootstrapper)
+        .map_err(|e| miette::diagnostic!("Failed to write bootstrap file for `clang`: {e}"))?;
+
+    let before = Instant::now();
+    for _ in 0..100 {
+        // First, transpile to C.
+        let out = cobc
+            .output()
+            .map_err(|e| miette::diagnostic!("Failed to execute `cobc`: {e}"))?;
+        if !out.status.success() {
+            miette::bail!(
+                "Failed benchmark for '{}' with `cobc` compiler error: {}",
+                benchmark.source_file,
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+
+        // Finally, perform compilation & linkage with `clang`.
+        let out = clang
+            .output()
+            .map_err(|e| miette::diagnostic!("Failed to execute `clang`: {e}"))?;
+        if !out.status.success() {
+            miette::bail!(
+                "Failed benchmark for '{}' with `clang` compiler error: {}",
+                benchmark.source_file,
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+    }
+    let elapsed = before.elapsed();
+    println!(
+        "clang(compile): Total time {:.2?}, average/run of {:.6?}.",
+        elapsed,
+        elapsed / 100
+    );
+
+    // Run the target program.
+    let (execute_time_total, execute_time_avg) = if !cfg.build_only {
+        let (x, y) = run_bench_bin(cfg, benchmark)?;
+        (Some(x), Some(y))
+    } else {
+        (None, None)
+    };
+
+    Ok(BenchmarkResult {
+        compile_time_total: elapsed,
+        compile_time_avg: elapsed / 100,
+        execute_time_total,
+        execute_time_avg,
+    })
+}
+
+/// Attempts to fetch the output C function name of the given benchmark COBOL file.
+/// If not found, throws an error.
+fn fetch_program_func(benchmark: &Benchmark) -> Result<String> {
+    // First, read in source of benchmark.
+    let source = std::fs::read_to_string(&benchmark.source_file).map_err(|e| {
+        miette::diagnostic!(
+            "Failed to read COBOL source for benchmark '{}': {e}",
+            benchmark.name
+        )
+    })?;
+
+    // Search for a pattern matching "PROGRAM-ID ...".
+    let prog_id_pat = Regex::new(r"PROGRAM-ID\. [A-Z0-9a-z\-]+").unwrap();
+    let prog_id_str = prog_id_pat.find(&source).ok_or(miette::diagnostic!(
+        "Could not find program ID in sources for benchmark '{}'.",
+        &benchmark.name
+    ))?;
+
+    // Extract the program ID, format into final function name.
+    let mut prog_id = prog_id_str.as_str()["PROGRAM-ID ".len()..].to_string();
+    prog_id = prog_id.replace("-", "__");
+    Ok(prog_id)
 }
 
 /// Executes a single generated benchmarking binary.

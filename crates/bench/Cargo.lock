@@ -128,6 +128,7 @@ dependencies = [
  "colored",
  "indicatif",
  "miette",
+ "regex",
  "sanitize-filename",
  "serde",
  "serde_json",

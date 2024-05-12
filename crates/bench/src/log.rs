@@ -69,6 +69,10 @@ pub(crate) struct BenchmarkExecution {
     /// Benchmark results for `cobc`, if present.
     /// Only generated when executed with `--run-comparative`.
     pub cobc_results: Option<BenchmarkResult>,
+
+    /// Benchmark results for `cobc` -> `clang`, if present.
+    /// Only generated when executed with `--run-clang`.
+    pub clang_results: Option<BenchmarkResult>,
 }
 
 /// Output for the result of a single benchmark compile/execute pair.

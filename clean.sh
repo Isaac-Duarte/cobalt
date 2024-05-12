@@ -59,6 +59,7 @@ rm -rf "$BUILD_DIR"
 echo -e "${CYAN}Cleaning generated benchmark artifacts...${NC}"
 BENCH_OUT_DIR="${SCRIPT_DIR}/bench_out"
 rm -rf $BENCH_OUT_DIR/*.o
+rm -rf $BENCH_OUT_DIR/*.c*
 rm -rf $BENCH_OUT_DIR/bench_bin
 
 # Done!

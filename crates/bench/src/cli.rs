@@ -38,6 +38,11 @@ pub struct Cli {
     #[arg(long, short = 'g', action)]
     pub run_comparative: bool,
 
+    /// Whether to run comparative tests against GnuCobol C -> clang.
+    /// Requires `run_comparative`.
+    #[arg(long, short = 'r', requires("run_comparative"), action)]
+    pub run_clang: bool,
+
     /// Whether to run only a build test and not execute benchmarks.
     #[arg(long, short = 'g', action)]
     pub build_only: bool,
@@ -105,6 +110,25 @@ impl TryInto<Cfg> for Cli {
                     } else {
                         miette::bail!(
                             "An error occurred while verifying if `cobc` was available: {}",
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        // Check that `clang` is available if required.
+        if self.run_clang {
+            match Command::new("clang").output() {
+                Ok(_) => {}
+                Err(e) => {
+                    if let ErrorKind::NotFound = e.kind() {
+                        miette::bail!(
+                            "Clang comparisons enabled, but `clang` was not found! Check your PATH."
+                        );
+                    } else {
+                        miette::bail!(
+                            "An error occurred while verifying if `clang` was available: {}",
                             e
                         );
                     }
@@ -223,6 +247,7 @@ impl TryInto<Cfg> for Cli {
             cobc_force_platform_linker: self.force_platform_linker,
             disable_hw_security: self.disable_hw_security,
             run_comparative: self.run_comparative,
+            run_clang: self.run_clang,
             build_only: self.build_only,
             output_dir,
             output_log,
