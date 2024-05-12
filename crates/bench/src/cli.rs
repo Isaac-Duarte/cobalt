@@ -34,13 +34,13 @@ pub struct Cli {
     #[arg(long, short = 'h', action)]
     pub disable_hw_security: bool,
 
-    /// Whether to run comparative tests against GnuCobol.
+    /// Whether to run comparative tests against GnuCobol's `cobc`.
     #[arg(long, short = 'g', action)]
-    pub run_comparative: bool,
+    pub run_cobc: bool,
 
     /// Whether to run comparative tests against GnuCobol C -> clang.
     /// Requires `run_comparative`.
-    #[arg(long, short = 'r', requires("run_comparative"), action)]
+    #[arg(long, short = 'r', action)]
     pub run_clang: bool,
 
     /// Whether to run only a build test and not execute benchmarks.
@@ -98,8 +98,8 @@ impl TryInto<Cfg> for Cli {
         // Get the optimisation level to compile at.
         let opt_level = self.cobalt_opt_level.unwrap_or("speed_and_size".into());
 
-        // If running comparative tests is enabled, ensure that GnuCobol's `cobc` is available.
-        if self.run_comparative {
+        // If running `cobc` at any point is enabled, ensure that GnuCobol's `cobc` is available.
+        if self.run_cobc || self.run_clang {
             match Command::new("cobc").output() {
                 Ok(_) => {}
                 Err(e) => {
@@ -246,7 +246,7 @@ impl TryInto<Cfg> for Cli {
             cobc_opt_level: self.cobc_opt_level,
             cobc_force_platform_linker: self.force_platform_linker,
             disable_hw_security: self.disable_hw_security,
-            run_comparative: self.run_comparative,
+            run_cobc: self.run_cobc,
             run_clang: self.run_clang,
             build_only: self.build_only,
             output_dir,

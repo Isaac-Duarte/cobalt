@@ -36,7 +36,7 @@ pub(crate) struct Cfg {
     pub disable_hw_security: bool,
 
     /// Whether to run comparative tests against GnuCobol's `cobc`.
-    pub run_comparative: bool,
+    pub run_cobc: bool,
 
     /// Whether to run comparative tests against `cobc` -> `clang`.
     pub run_clang: bool,
@@ -73,7 +73,7 @@ pub(crate) fn run_single(cfg: &Cfg, benchmark: &Benchmark) -> Result<BenchmarkEx
     );
     let cobalt_results = run_cobalt(cfg, benchmark)?;
     let cobc_results = cfg
-        .run_comparative
+        .run_cobc
         .then(|| run_cobc(cfg, benchmark))
         .transpose()?;
     let clang_results = cfg
