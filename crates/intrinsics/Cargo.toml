@@ -11,6 +11,7 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
+lto = true
 
 [dependencies]
 libc = "0.2.153"
