@@ -1,5 +1,5 @@
 <div align="center">
-<img src="logo.png" width="400"/>
+<img src="logo.png" width="500"/>
 
 *An experimental COBOL compiler, written in Rust.*
 </div>
