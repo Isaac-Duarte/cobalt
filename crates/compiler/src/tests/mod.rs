@@ -2,6 +2,7 @@
 mod common;
 
 // Individual conformance test modules.
-mod io;
 mod data;
+mod intrinsics;
+mod io;
 mod memory;

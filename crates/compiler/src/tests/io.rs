@@ -83,7 +83,7 @@ fn accept_str() {
     CommonTestRunner::new("accept_str")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. DISPLAY-DATA-TEST.
+PROGRAM-ID. ACCEPT-STR-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -95,5 +95,47 @@ PROCEDURE DIVISION.
 STOP RUN.
         "#)
         .expect_output_with_input("InitialVal\n", "InitialVal\n")
+        .run();
+}
+
+/// Tests that accepting an integer via. stdin works as expected.
+#[test]
+fn accept_int() {
+    CommonTestRunner::new("accept_int")
+        .source(r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. ACCEPT-INT-TEST.
+
+DATA DIVISION.
+    WORKING-STORAGE SECTION.
+    01 INT-VAL PIC 9(4) COMP.
+
+PROCEDURE DIVISION.
+    ACCEPT INT-VAL.
+    DISPLAY INT-VAL.
+STOP RUN.
+        "#)
+        .expect_output_with_input("2024\n", "2024\n")
+        .run();
+}
+
+/// Tests that accepting a floating point value via. stdin works as expected.
+#[test]
+fn accept_float() {
+    CommonTestRunner::new("accept_float")
+        .source(r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. ACCEPT-FLT-TEST.
+
+DATA DIVISION.
+    WORKING-STORAGE SECTION.
+    01 FLT-VAL PIC S9(4)P9(5) COMP.
+
+PROCEDURE DIVISION.
+    ACCEPT FLT-VAL.
+    DISPLAY FLT-VAL.
+STOP RUN.
+        "#)
+        .expect_output_with_input("-1234.5678\n", "-1234.5678\n")
         .run();
 }

@@ -6,7 +6,7 @@ fn str_initial_value() {
     CommonTestRunner::new("str_initial_val")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. INITIAL-VALUE-TEST.
+PROGRAM-ID. STR-INITIAL-VALUE-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -26,7 +26,7 @@ fn invalid_str_initial_value() {
     CommonTestRunner::new("invalid_str_initial_val")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. INITIAL-VALUE-TEST.
+PROGRAM-ID. INV-STR-INITIAL-VALUE-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -46,7 +46,7 @@ fn int_initial_value() {
     CommonTestRunner::new("int_initial_val")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. INITIAL-VALUE-TEST.
+PROGRAM-ID. INT-INITIAL-VALUE-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -66,7 +66,7 @@ fn invalid_int_initial_value() {
     CommonTestRunner::new("invalid_int_initial_val")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. INITIAL-VALUE-TEST.
+PROGRAM-ID. INV-INT-INITIAL-VALUE-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -86,7 +86,7 @@ fn float_initial_value() {
     CommonTestRunner::new("float_initial_val")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. INITIAL-VALUE-TEST.
+PROGRAM-ID. FLT-INITIAL-VALUE-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
