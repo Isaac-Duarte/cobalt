@@ -108,11 +108,7 @@ PROGRAM-ID. ACCEPT-INT-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
-<<<<<<< HEAD
-    01 INT-VAL PIC 9(4) COMP.
-=======
     01 INT-VAL PIC 9(8) COMP.
->>>>>>> db58ecf (ci(feat): Add additional tests for arithmetic, control.)
 
 PROCEDURE DIVISION.
     ACCEPT INT-VAL.
