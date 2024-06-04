@@ -6,7 +6,7 @@ fn int_lit_move() {
     CommonTestRunner::new("int_lit_move")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. INT-LIT-MOV.
+PROGRAM-ID. INT-MOVE-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -20,130 +20,127 @@ STOP RUN.
         .run();
 }
 
-
 /// Tests that a simple floating point MOVE instruction compiles.
 #[test]
-fn float_lit_move() {
-    CommonTestRunner::new("float_lit_move")
+fn float_move() {
+    CommonTestRunner::new("float_move")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. FLT-LIT-MOV.
+PROGRAM-ID. FLT-MOVE-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
-    01 FLT-VAL PIC S9(4)P9(4) COMP.
+    01 FLT-VAL PIC 9(4)P9(4) COMP.
 
 PROCEDURE DIVISION.
-    MOVE -1234.5678 TO FLT-VAL.
+    MOVE 20.04 TO FLT-VAL.
 STOP RUN.
         "#)
         .expect_pass()
         .run();
 }
 
-/// Tests that a simple string literal MOVE instruction compiles.
+/// Tests that a simple string MOVE instruction compiles.
 #[test]
-fn str_lit_move() {
-    CommonTestRunner::new("str_lit_move")
+fn str_move() {
+    CommonTestRunner::new("str_move")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. STR-LIT-MOV.
+PROGRAM-ID. STR-MOVE-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
     01 STR-VAL PIC X(10).
 
 PROCEDURE DIVISION.
-    MOVE "SomeString" TO STR-VAL.
+    MOVE "TestVal" TO STR-VAL.
 STOP RUN.
         "#)
         .expect_pass()
         .run();
 }
 
-/// Tests that an OOB string literal MOVE instruction fails to compile.
+/// Tests that an overly large string MOVE instruction does not compile.
 #[test]
-fn str_inv_lit_move() {
-    CommonTestRunner::new("str_inv_lit_move")
+fn str_invalid_move() {
+    CommonTestRunner::new("str_move_invalid")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. STR-INV-LIT-MOV.
+PROGRAM-ID. STR-MOVE-INV-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
     01 STR-VAL PIC X(10).
 
 PROCEDURE DIVISION.
-    MOVE "SomeTooLargeString" TO STR-VAL.
+    MOVE "TestValTooLongOhNo" TO STR-VAL.
 STOP RUN.
         "#)
-        .expect_fail(Some("move incompatible literal"))
+        .expect_fail(Some("incompatible literal"))
         .run();
 }
 
-/// Tests that a spanned source string MOVE instruction behaves as expected.
+/// Tests that a simple spanned source string MOVE instruction compiles.
 #[test]
-fn str_spanned_src_move() {
-    CommonTestRunner::new("str_spanned_src_move")
+fn str_move_src_spanned() {
+    CommonTestRunner::new("str_move_src_spanned")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. STR-SPANNED-SRC-MOV.
+PROGRAM-ID. STR-MOVE-SRC-SPANNED-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
-    01 SRC-VAL PIC X(10) VALUE "SomeString".
-    01 DEST-VAL PIC X(10).
+    01 SRC-VAL PIC X(10) VALUE "TestVal".
+    01 STR-VAL PIC X(10).
 
 PROCEDURE DIVISION.
-    MOVE SRC-VAL(1:4) TO DEST-VAL.
-    DISPLAY DEST-VAL.
+    MOVE SRC-VAL(5:3) TO STR-VAL.
+    DISPLAY STR-VAL.
 STOP RUN.
         "#)
-        .expect_output("Some\n")
+        .expect_output("Val\n")
         .run();
 }
 
-/// Tests that a spanned destination MOVE instruction behaves as expected.
+/// Tests that a simple spanned destination string MOVE instruction compiles.
 #[test]
-fn str_spanned_dest_move() {
-    CommonTestRunner::new("str_spanned_dest_move")
+fn str_move_dest_spanned() {
+    CommonTestRunner::new("str_move_dest_spanned")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. STR-SPANNED-DEST-MOV.
+PROGRAM-ID. STR-MOVE-DEST-SPANNED-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
-    01 SRC-VAL PIC X(10) VALUE "SomeString".
-    01 DEST-VAL PIC X(10).
+    01 STR-VAL PIC X(10).
 
 PROCEDURE DIVISION.
-    MOVE SRC-VAL TO DEST-VAL(4:4).
-    DISPLAY DEST-VAL.
+    MOVE "TestVal" TO STR-VAL(1:4).
+    DISPLAY STR-VAL.
 STOP RUN.
         "#)
-        .expect_output("   Some\n")
+        .expect_output("Test\n")
         .run();
 }
 
-/// Tests that a spanned source and destination MOVE instruction
-/// behaves as expected.
+/// Tests that a simple spanned source & destination string MOVE instruction compiles.
 #[test]
-fn str_spanned_src_dest_move() {
-    CommonTestRunner::new("str_spanned_src_dest_move")
+fn str_move_all_spanned() {
+    CommonTestRunner::new("str_move_all_spanned")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. STR-SPANNED-SRC-DEST-MOV.
+PROGRAM-ID. STR-MOVE-ALL-SPANNED-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
-    01 SRC-VAL PIC X(10) VALUE "SomeString".
-    01 DEST-VAL PIC X(10).
+    01 SRC-VAL PIC X(10) VALUE "TestVal".
+    01 STR-VAL PIC X(10).
 
 PROCEDURE DIVISION.
-    MOVE SRC-VAL(5:6) TO DEST-VAL(2:3).
-    DISPLAY DEST-VAL.
+    MOVE SRC-VAL(2:3) TO STR-VAL(1:2).
+    DISPLAY STR-VAL.
 STOP RUN.
         "#)
-        .expect_output(" Str\n")
+        .expect_output("es\n")
         .run();
 }

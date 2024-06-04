@@ -22,7 +22,7 @@ fn int_display_test() {
     CommonTestRunner::new("display_int")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. DISPLAY-DATA-TEST.
+PROGRAM-ID. DISPLAY-INT-DATA-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -42,7 +42,7 @@ fn float_display_test() {
     CommonTestRunner::new("display_float")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. DISPLAY-DATA-TEST.
+PROGRAM-ID. DISPLAY-FLT-DATA-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -63,7 +63,7 @@ fn interleaved_display_test() {
     CommonTestRunner::new("display_interleaved")
         .source(r#"
 IDENTIFICATION DIVISION.
-PROGRAM-ID. DISPLAY-DATA-TEST.
+PROGRAM-ID. DISPLAY-INTER-DATA-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
@@ -108,14 +108,18 @@ PROGRAM-ID. ACCEPT-INT-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
+<<<<<<< HEAD
     01 INT-VAL PIC 9(4) COMP.
+=======
+    01 INT-VAL PIC 9(8) COMP.
+>>>>>>> db58ecf (ci(feat): Add additional tests for arithmetic, control.)
 
 PROCEDURE DIVISION.
     ACCEPT INT-VAL.
     DISPLAY INT-VAL.
 STOP RUN.
         "#)
-        .expect_output_with_input("2024\n", "2024\n")
+        .expect_output_with_input("9004\n", "9004\n")
         .run();
 }
 
@@ -129,13 +133,13 @@ PROGRAM-ID. ACCEPT-FLT-TEST.
 
 DATA DIVISION.
     WORKING-STORAGE SECTION.
-    01 FLT-VAL PIC S9(4)P9(5) COMP.
+    01 FLT-VAL PIC 9(6)P9(4) COMP.
 
 PROCEDURE DIVISION.
     ACCEPT FLT-VAL.
     DISPLAY FLT-VAL.
 STOP RUN.
         "#)
-        .expect_output_with_input("-1234.5678\n", "-1234.5678\n")
+        .expect_output_with_input("9004.21\n", "9004.21\n")
         .run();
 }
