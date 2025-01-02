@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use block::BlockManager;
 /**
  * Structures and utilities for converting parsed ASTs into Cranelift IR.
  */
@@ -25,6 +26,7 @@ use self::{
 
 use super::parser::{Ast, Paragraph};
 
+mod block;
 mod data;
 mod func;
 mod intrinsics;
@@ -59,6 +61,8 @@ pub struct CodeGenerator<'cfg, 'src> {
 
     /// Manages function registration for this module.
     func_manager: FuncManager,
+
+    block_manager: BlockManager,
 }
 
 impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
@@ -82,6 +86,7 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
             intrinsics: IntrinsicManager::new(),
             data_manager: DataManager::new(),
             func_manager: FuncManager::new(),
+            block_manager: BlockManager::new(),
         })
     }
 
@@ -215,7 +220,14 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
         // Create builder, begin entry block for function.
         {
             let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_ctx);
-            let entry_block = builder.create_block();
+            let entry_block = self.block_manager.get_or_create_block(
+                &mut builder,
+                paragraph
+                    .name
+                    .map(|para| para.0)
+                    .unwrap_or("cobalt::entrypoint"),
+            );
+
             builder.append_block_params_for_function_params(entry_block);
 
             // Switch to block for this function.
@@ -232,6 +244,7 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
                 &mut self.intrinsics,
                 &mut self.data_manager,
                 &mut self.func_manager,
+                &mut self.block_manager,
             );
             trans.translate(&paragraph.stats)?;
 

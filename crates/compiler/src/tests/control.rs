@@ -86,3 +86,27 @@ PROCEDURE DIVISION.
         .expect_output("HelloHelloHello\n\n\n")
         .run();
 }
+
+#[test]
+fn goto() {
+    CommonTestRunner::new("perform_times")
+    .source(r#"
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. GOTO-TEST.
+
+       PROCEDURE DIVISION.
+           DISPLAY "Enter 1 for PARAGRAPH-ONE, 2 for PARAGRAPH-TWO, or 3 for PARAGRAPH-THREE.".
+           
+           GOTO PARAGRAPH-ONE.
+
+       PARAGRAPH-ONE.
+           DISPLAY "This is the first paragraph in the program.".
+           PERFORM END-PROGRAM.
+
+       END-PROGRAM.
+           DISPLAY "END OF PROGRAM".
+           STOP RUN.
+    "#)
+    .expect_output("HelloHelloHello\n\n\n")
+    .run();
+}

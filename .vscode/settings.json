@@ -9,5 +9,8 @@
         "crates/compiler/Cargo.toml",
         "crates/intrinsics/Cargo.toml",
         "crates/bench/Cargo.toml",
+    ],
+    "cSpell.words": [
+        "Cranelift"
     ]
 }

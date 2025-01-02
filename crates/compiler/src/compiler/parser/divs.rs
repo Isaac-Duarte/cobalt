@@ -86,6 +86,7 @@ impl<'src> Parser<'src> {
         // If this paragraph has a name, parse that out.
         let name = if self.peek() == tok![ident] {
             let name_tok = self.next()?;
+  
             self.consume_vec(&[tok![.], tok![eol]])?;
             Some((self.text(name_tok), name_tok.1))
         } else {
