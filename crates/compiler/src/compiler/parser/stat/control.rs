@@ -102,31 +102,3 @@ impl<'src> Parser<'src> {
         Ok(Stat::Exit(exit_type))
     }
 }
-
-#[derive(Debug)]
-pub(crate) enum GotoType<'src> {
-    Paragraph(&'src str),
-}
-
-impl<'src> Parser<'src> {
-    /// Parses a single "GOTO" statement from the current position.
-    pub(super) fn parse_goto(&mut self) -> Result<Stat<'src>> {
-        self.consume(tok![goto])?;
-
-        let para_tok = self.consume(tok![ident])?;
-        let para_txt = self.text(para_tok);
-
-        let goto_type = match self.peek() {
-            tok![.] => GotoType::Paragraph(para_txt),
-            tok => {
-                parser_bail!(
-                    self,
-                    "Expected one of: PARAGRAPH for goto statement, instead found {}.",
-                    tok
-                );
-            }
-        };
-        
-        Ok(Stat::Goto(goto_type))
-    }
-}

@@ -7,7 +7,7 @@ use cranelift::{
 };
 use miette::Result;
 
-use crate::compiler::parser::{self, Cond, ExitType, GotoType, Literal, PerformType};
+use crate::compiler::parser::{self, Cond, ExitType, Literal, PerformType};
 
 use super::FuncTranslator;
 
@@ -192,26 +192,6 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
                 self.builder.ins().return_(&[]);
             }
         }
-        Ok(())
-    }
-
-    /// Translates a single goto instruction to Cranelift IR.
-    pub(super) fn translate_goto(&mut self, goto_type: &GotoType) -> Result<()> {
-        match goto_type {
-            GotoType::Paragraph(para) => {
-                // Fetch or create the block corresponding to the paragraph
-                let block_call_label = match self.blocks.get_block(&para) {
-                    Some(block) => block,
-                    None => {
-                        miette::bail!("Unable to locate block for goto statement. Paragraph: {para}.")
-                    }
-                };
-
-                // Emit the jump instruction
-                self.builder.ins().jump(block_call_label, &[]);
-            }
-        }
-        
         Ok(())
     }
 }

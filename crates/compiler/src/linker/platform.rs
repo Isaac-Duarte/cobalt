@@ -77,7 +77,7 @@ impl PlatformConfig {
     /// Detects the linker configuration for an x86_64 Linux host.
     fn detect_linux_x64(cfg: &BuildConfig) -> Result<Self> {
         // Sanity check that the crt, loader exist.
-        let crt = PathBuf::from("/lib/crt1.o");
+        let crt = PathBuf::from("/usr/lib/x86_64-linux-gnu/crt1.o");
         let loader = PathBuf::from("/lib64/ld-linux-x86-64.so.2");
         if !crt.exists() {
             miette::bail!(

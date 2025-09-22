@@ -24,7 +24,6 @@ pub(crate) enum Stat<'src> {
     Perform(PerformType<'src>),
     Accept(&'src str),
     Exit(ExitType),
-    Goto(GotoType<'src>),
 }
 
 impl<'src> Parser<'src> {
@@ -45,7 +44,6 @@ impl<'src> Parser<'src> {
             tok![perform] => self.parse_perform()?,
             tok![accept] => self.parse_accept()?,
             tok![exit] => self.parse_exit()?,
-            tok![goto] => self.parse_goto()?,
 
             // Unknown token.
             tok => {

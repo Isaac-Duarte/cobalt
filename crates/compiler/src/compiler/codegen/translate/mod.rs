@@ -10,7 +10,9 @@ use miette::Result;
 use self::value::ValueCache;
 
 use super::{
-    block::BlockManager, data::DataManager, func::FuncManager, intrinsics::{CobaltIntrinsic, IntrinsicManager}
+    data::DataManager,
+    func::FuncManager,
+    intrinsics::{CobaltIntrinsic, IntrinsicManager},
 };
 
 mod cond;
@@ -41,8 +43,6 @@ pub(super) struct FuncTranslator<'a, 'src: 'a> {
     /// The function manager for the program.
     pub funcs: &'a mut FuncManager,
 
-    pub blocks: &'a mut BlockManager,
-
     /// Cache of values loaded for this function.
     values: ValueCache,
 }
@@ -56,7 +56,6 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
         intrinsics: &'a mut IntrinsicManager,
         data: &'a mut DataManager,
         funcs: &'a mut FuncManager,
-        blocks: &'a mut BlockManager,
     ) -> Self {
         Self {
             builder,
@@ -65,7 +64,6 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             intrinsics,
             data,
             funcs,
-            blocks,
             values: ValueCache::new(),
         }
     }
@@ -115,8 +113,6 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             Stat::Perform(perform) => self.translate_perform(perform)?,
             Stat::Accept(target) => self.translate_accept(target)?,
             Stat::Exit(exit_type) => self.translate_exit(exit_type)?,
-            Stat::Goto(goto_type) => self.translate_goto(goto_type)?,
-            
         }
 
         // Determine whether the statement has filled the block.
