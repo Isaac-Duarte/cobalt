@@ -42,6 +42,7 @@ macro_rules! tok {
     [function] => { $crate::compiler::parser::Token::Function };
     [exit] => { $crate::compiler::parser::Token::Exit };
     [paragraph] => { $crate::compiler::parser::Token::Paragraph };
+    [goto] => { $crate::compiler::parser::Token::Goto };
     [=] => { $crate::compiler::parser::Token::Equals };
     [<=] => { $crate::compiler::parser::Token::LessThanEqual };
     [>=] => { $crate::compiler::parser::Token::GreaterThanEqual };
@@ -191,6 +192,9 @@ pub(crate) enum Token {
     Exit,
     #[token("PARAGRAPH")]
     Paragraph,
+    #[token("GOTO")]
+    #[token("GO TO")]
+    Goto,
 
     // Symbols & regex tokens.
     #[token("=")]
@@ -277,6 +281,7 @@ impl Display for Token {
             Token::Function => write!(f, "FUNCTION"),
             Token::Exit => write!(f, "EXIT"),
             Token::Paragraph => write!(f, "PARAGRAPH"),
+            Token::Goto => write!(f, "GOTO"),
             Token::Equals => write!(f, "="),
             Token::LessThanEqual => write!(f, "<="),
             Token::GreaterThanEqual => write!(f, ">="),

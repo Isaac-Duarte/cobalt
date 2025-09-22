@@ -19,6 +19,14 @@ pub(crate) enum PerformType<'src> {
 }
 
 impl<'src> Parser<'src> {
+    /// Parses a single "GOTO" statement from the current position.
+    pub(super) fn parse_goto(&mut self) -> miette::Result<Stat<'src>> {
+        self.consume(tok![goto])?;
+        let target_tok = self.consume(tok![ident])?;
+        let target = self.text(target_tok);
+        Ok(Stat::Goto(target))
+    }
+
     /// Parses a single "PERFORM" statement from the current position.
     pub(super) fn parse_perform(&mut self) -> Result<Stat<'src>> {
         self.consume(tok![perform])?;

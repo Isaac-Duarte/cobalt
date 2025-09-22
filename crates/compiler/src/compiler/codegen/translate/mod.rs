@@ -69,7 +69,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
     }
 
     /// Generates Cranelift IR for a single statement from the given set of statements.
-    pub fn translate(&mut self, stats: &Vec<Spanned<Stat<'src>>>) -> Result<()> {
+    pub fn translate(&mut self, stats: &Vec<Spanned<Stat<'src>>>) -> Result<bool> {
         // Reset the intrinsics manager, function manager since we're beginning a new function.
         self.intrinsics.clear_refs();
         self.funcs.clear_refs();
@@ -83,7 +83,7 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             }
             block_self_terminates |= self.translate_stat(stat)?;
         }
-        Ok(())
+        Ok(block_self_terminates)
     }
 
     /// Generates Cranelift IR for a program termination.
@@ -113,11 +113,12 @@ impl<'a, 'src> FuncTranslator<'a, 'src> {
             Stat::Perform(perform) => self.translate_perform(perform)?,
             Stat::Accept(target) => self.translate_accept(target)?,
             Stat::Exit(exit_type) => self.translate_exit(exit_type)?,
+            Stat::Goto(target) => self.translate_goto(target)?,
         }
 
         // Determine whether the statement has filled the block.
         match &stat.0 {
-            Stat::Exit(_) => Ok(true),
+            Stat::Exit(_) | Stat::Goto(_) => Ok(true),
             _ => Ok(false),
         }
     }

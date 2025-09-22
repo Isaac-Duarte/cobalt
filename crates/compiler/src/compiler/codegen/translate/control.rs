@@ -12,6 +12,16 @@ use crate::compiler::parser::{self, Cond, ExitType, Literal, PerformType};
 use super::FuncTranslator;
 
 impl<'a, 'src> FuncTranslator<'a, 'src> {
+    /// Translates an unconditional GOTO to a paragraph.
+    /// In Cobalt's model where each paragraph is a separate function,
+    /// this is implemented as a tail-call to the target paragraph followed by return.
+    pub(super) fn translate_goto(&mut self, target: &'src str) -> Result<()> {
+        let func_ref = self.funcs.get_ref(self.module, self.builder.func, target)?;
+        self.builder.ins().call(func_ref, &[]);
+        self.builder.ins().return_(&[]);
+        Ok(())
+    }
+
     /// Translates the given PERFORM statement into Cranelift IR.
     pub(super) fn translate_perform(&mut self, perform: &PerformType<'src>) -> Result<()> {
         match perform {

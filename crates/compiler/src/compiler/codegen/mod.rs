@@ -233,13 +233,15 @@ impl<'cfg, 'src> CodeGenerator<'cfg, 'src> {
                 &mut self.data_manager,
                 &mut self.func_manager,
             );
-            trans.translate(&paragraph.stats)?;
+            let terminated = trans.translate(&paragraph.stats)?;
 
             // If this function terminates, emit a call to `exit()`.
             if paragraph.terminates {
                 trans.translate_terminate()?;
             }
-            trans.builder.ins().return_(&[]);
+            if !terminated {
+                trans.builder.ins().return_(&[]);
+            }
 
             // Finish the function.
             trans.builder.finalize();
